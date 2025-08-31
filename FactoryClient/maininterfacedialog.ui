@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainInterfaceDialog</class>
+ <widget class="QDialog" name="MainInterfaceDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>工厂客户端 - 主界面</string>
+  </property>
+  <widget class="QTabBar" name="tabBar"/>
+  <widget class="QStackedWidget" name="stackedWidget">
+   <widget class="QWidget" name="page">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QLabel" name="emptyLabel">
+       <property name="text">
+        <string>无工作任务正在进行</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QPushButton" name="loginButton"/>
+  <widget class="QPushButton" name="workOrderButton"/>
+  <widget class="QPushButton" name="newWorkOrderButton"/>
+  <widget class="QPushButton" name="workOrderListButton"/>
+  <widget class="QPushButton" name="communicationButton"/>
+  <widget class="QPushButton" name="textMessageButton"/>
+  <widget class="QPushButton" name="deviceMonitorButton"/>
+  <widget class="QPushButton" name="realTimeDataButton"/>
+  <widget class="QPushButton" name="deviceRecordingButton"/>
+  <widget class="QPushButton" name="knowledgeBaseButton"/>
+  <widget class="QPushButton" name="accountButton"/>
+  <widget class="QPushButton" name="logoutButton"/>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,9 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource>
+        <file>icons/minimize.svg</file>
+        <file>icons/maximize.svg</file>
+        <file>icons/windowed.svg</file>
+        <file>icons/close.svg</file>
+    </qresource>
+</RCC>
