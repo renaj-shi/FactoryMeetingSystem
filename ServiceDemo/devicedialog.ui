@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DeviceDialogBase</class>
+ <widget class="QDialog" name="DeviceDialogBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>826</width>
+    <height>654</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <widget class="QPushButton" name="close">
+   <property name="geometry">
+    <rect>
+     <x>710</x>
+     <y>0</y>
+     <width>113</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>关闭</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="verticalLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>90</x>
+     <y>0</y>
+     <width>160</width>
+     <height>271</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="tempLabel">
+      <property name="text">
+       <string>tempLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="vibrationLabel">
+      <property name="text">
+       <string>vibrationLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="pressureLabel">
+      <property name="text">
+       <string>pressureLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="voltageLabel">
+      <property name="text">
+       <string>voltageLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="currentLabel">
+      <property name="text">
+       <string>currentLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="speedLabel">
+      <property name="text">
+       <string>speedLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="updateTimeLabel">
+      <property name="text">
+       <string>updateTimeLabel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="statusLabel">
+      <property name="text">
+       <string>statusLabel</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="verticalLayoutWidget_2">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>81</width>
+     <height>267</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <item>
+     <widget class="QLabel" name="tempLabel_2">
+      <property name="text">
+       <string>温度</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="vibrationLabel_2">
+      <property name="text">
+       <string>振动</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="pressureLabel_2">
+      <property name="text">
+       <string>压力</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="voltageLabel_2">
+      <property name="text">
+       <string>电压</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="currentLabel_2">
+      <property name="text">
+       <string>电流</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="speedLabel_2">
+      <property name="text">
+       <string>速度</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="updateTimeLabel_2">
+      <property name="text">
+       <string>更新时间</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="statusLabel_2">
+      <property name="text">
+       <string>状态</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QTableView" name="tableHistoryView">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>280</y>
+     <width>791</width>
+     <height>341</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QWidget" name="verticalLayoutWidget_3">
+   <property name="geometry">
+    <rect>
+     <x>340</x>
+     <y>90</y>
+     <width>151</width>
+     <height>117</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+     <widget class="QComboBox" name="comboBox">
+      <item>
+       <property name="text">
+        <string>温度</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>压力</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>振动</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>电流</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>电压</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>转速</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="pushButton">
+      <property name="text">
+       <string>查看变化趋势</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="pushButton_2">
+      <property name="text">
+       <string>刷新历史数据</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="verticalLayoutWidget_4">
+   <property name="geometry">
+    <rect>
+     <x>570</x>
+     <y>110</y>
+     <width>160</width>
+     <height>81</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_4">
+    <item>
+     <widget class="QPushButton" name="cautionButton">
+      <property name="text">
+       <string>！故障预警！</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="deleteHistoryButton">
+      <property name="text">
+       <string>删除历史数据</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
