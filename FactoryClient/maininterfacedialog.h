@@ -11,15 +11,17 @@
 #include <QGroupBox>
 #include <QMap>
 #include <QStringList>
-// 【增】添加所需头文件
 #include <QTcpSocket>
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QComboBox>
 #include <QTimer>
+#include <QRadioButton>
+#include <QButtonGroup>
 #include "devicemonitorpanel.h"
 #include <QDateTime>
-
+// 【增】添加所需头文件
+#include "meetingdialog.h"
 // 设备参数结构体
 struct DeviceParams {
     double temperature;      // 温度
@@ -31,6 +33,10 @@ struct DeviceParams {
     int status;              // 设备状态
     QDateTime lastUpdate;    // 最后更新时间
 };
+
+// 前向声明
+class WorkOrderDialog;
+class ChatDialog;
 
 namespace Ui {
 class MainInterfaceDialog;
@@ -54,7 +60,7 @@ private slots:
     void on_workOrderListButton_clicked();
     void on_communicationButton_clicked();
     void on_textMessageButton_clicked();
-    void on_onlineMeetingButton_clicked();
+    void on_joinMeetingButton_clicked();
     void on_deviceMonitorButton_clicked();
     void on_realTimeDataButton_clicked();
     void on_deviceRecordingButton_clicked();
@@ -80,12 +86,16 @@ private:
     QByteArray  m_recvBuf; // 接收缓冲区，用于处理没有换行符的消息
     QTimer*     m_netPump = nullptr; // 网络数据轮询泵
     QVBoxLayout* m_sidebarLayout = nullptr;
+    QComboBox*  newPrioBox_   = nullptr; // 保留用于向后兼容
     QLineEdit*  newTitleEdit_ = nullptr;
-    QTextEdit*  newDescEdit_  = nullptr;
-    QComboBox*  newPrioBox_   = nullptr;
-    QLabel*     newResultLabel_ = nullptr;
+    QTextEdit*  newDescEdit_ = nullptr;
+    QLabel* newResultLabel_= nullptr;
     DeviceMonitorPanel* m_deviceMonitorPanel = nullptr; // 指向设备监控面板的指针
+    WorkOrderDialog* m_workOrderDialog = nullptr; // 指向新建工单对话框的指针
+    ChatDialog* m_chatDialog = nullptr; // 指向聊天对话框的指针
     QMap<QString, DeviceParams> m_deviceDataCache; // 设备数据缓存，用于实时页未创建时存储数据
+    MeetingDialog *meetingDialog;
+
     void setupUI(); // 设置UI
     void createSidebar(); // 创建侧边栏
     void createTopBar(); // 创建顶部栏

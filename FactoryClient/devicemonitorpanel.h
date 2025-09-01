@@ -6,6 +6,10 @@
 #include <QMap>
 #include "deviceinfo.h"
 
+namespace Ui {
+class DeviceMonitorPanel;
+}
+
 // 前向声明
 class QLabel;
 class QFrame;
@@ -19,7 +23,7 @@ class DeviceMonitorPanel : public QWidget
 public:
     explicit DeviceMonitorPanel(QWidget *parent = nullptr);
     ~DeviceMonitorPanel();
-    
+
     // 初始化UI
     void initialize();
     
@@ -46,6 +50,8 @@ public:
     void updateLastParameterTime(const QString &deviceId);
     
 private:
+    Ui::DeviceMonitorPanel *ui;
+    
     // 创建设备栏
     QWidget* createDeviceBar(const DeviceInfo &device);
     
