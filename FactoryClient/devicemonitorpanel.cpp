@@ -1,4 +1,5 @@
 #include "devicemonitorpanel.h"
+#include "ui_devicemonitorpanel.h"
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -15,16 +16,15 @@
 
 DeviceMonitorPanel::DeviceMonitorPanel(QWidget *parent)
     : QWidget(parent),
-      m_mainLayout(new QVBoxLayout(this)),
+      ui(new Ui::DeviceMonitorPanel),
       m_updateTimer(new QTimer(this)),
       m_timeoutThreshold(2000)
 {
     // 设置窗口大小策略，使其能够占满父容器
     this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
-    // 设置布局
-    m_mainLayout->setContentsMargins(0, 0, 0, 0);
-    m_mainLayout->setSpacing(0);
+    // 设置UI
+    ui->setupUi(this);
     
     // 初始化定时器
     connect(m_updateTimer, &QTimer::timeout, this, &DeviceMonitorPanel::updateData);
@@ -51,50 +51,46 @@ bool DeviceMonitorPanel::eventFilter(QObject *watched, QEvent *event)
 
 DeviceMonitorPanel::~DeviceMonitorPanel()
 {
+    delete ui;
     delete m_updateTimer;
 }
 
 void DeviceMonitorPanel::initialize()
 {
-    // 创建滚动区域作为主容器
-    QScrollArea *scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    scrollArea->setStyleSheet(
-        "QScrollArea { border: none; }"
-        "QScrollBar:vertical { background: #f1f5f9; width: 8px; border-radius: 4px; }"
-        "QScrollBar::handle:vertical { background: #cbd5e1; border-radius: 4px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
-    );
+    // 获取UI文件中的滚动区域和布局
+    QScrollArea *scrollArea = ui->scrollArea;
+    QVBoxLayout *scrollLayout = ui->scrollLayout;
+    QWidget *scrollContent = ui->scrollContent;
     
-    // 设置滚动区域大小策略为扩展
-    scrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    
-    // 创建滚动区域的内容widget
-    QWidget *scrollContent = new QWidget();
+    // 设置滚动区域内容大小策略
     scrollContent->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    QVBoxLayout *scrollLayout = new QVBoxLayout(scrollContent);
-    scrollLayout->setContentsMargins(0, 0, 0, 0);
-    scrollLayout->setSpacing(0);
     
-    // 添加标题
-    QLabel *titleLabel = new QLabel("设备监控面板", scrollContent);
-    titleLabel->setStyleSheet(
+    // 清空布局，只保留标题
+    while (scrollLayout->count() > 2) { // 保留标题和底部的spacer
+        QLayoutItem *item = scrollLayout->takeAt(1);
+        if (item) {
+            if (item->widget()) {
+                delete item->widget();
+            }
+            delete item;
+        }
+    }
+    
+    // 确保标题样式正确
+    ui->titleLabel->setStyleSheet(
         "font-size: 20px; "
         "font-weight: bold; "
         "color: #1e293b; "
         "margin-bottom: 20px; "
         "margin-top: 10px;"
     );
-    scrollLayout->addWidget(titleLabel, 0, Qt::AlignCenter);
     
     // 创建设备栏和参数抽屉
     for (const auto &device : m_deviceManager.devices()) {
         // 创建设备栏
         QWidget *deviceBar = createDeviceBar(device);
         m_deviceBars[device.deviceId()] = deviceBar;
-        scrollLayout->addWidget(deviceBar);
+        scrollLayout->insertWidget(scrollLayout->count() - 1, deviceBar); // 插入到spacer之前
         
         // 创建参数抽屉（初始隐藏）
         QWidget *parameterDrawer = createParameterDrawer(device);
@@ -102,7 +98,7 @@ void DeviceMonitorPanel::initialize()
         parameterDrawer->setMinimumHeight(0);
         parameterDrawer->hide();
         m_parameterDrawers[device.deviceId()] = parameterDrawer;
-        scrollLayout->addWidget(parameterDrawer);
+        scrollLayout->insertWidget(scrollLayout->count() - 1, parameterDrawer); // 插入到spacer之前
         
         // 创建动画
         QPropertyAnimation *animation = new QPropertyAnimation(parameterDrawer, "maximumHeight");
@@ -116,12 +112,6 @@ void DeviceMonitorPanel::initialize()
         // 初始化最后更新时间为当前时间减去4秒，确保如果没有收到数据，进入界面时立即显示未连接状态
         m_lastParameterUpdateTime[device.deviceId()] = QDateTime::currentMSecsSinceEpoch() - 4000;
     }
-    
-    scrollLayout->addStretch();
-    
-    // 设置滚动区域内容
-    scrollArea->setWidget(scrollContent);
-    m_mainLayout->addWidget(scrollArea);
 }
 
 QWidget* DeviceMonitorPanel::createDeviceBar(const DeviceInfo &device)
@@ -458,24 +448,18 @@ void DeviceMonitorPanel::updateDeviceBar(const QString &deviceId)
 
 void DeviceMonitorPanel::updateParameterDrawer(const QString &deviceId)
 {
-    // 输出调试信息，确认此函数被调用
-    qDebug() << "[DeviceMonitor] 尝试更新设备参数抽屉，设备ID:" << deviceId;
-    
     DeviceInfo *device = m_deviceManager.getDevice(deviceId);
     if (!device) {
-        qDebug() << "[DeviceMonitor] 未找到设备，设备ID:" << deviceId;
         return;
     }
     
     QWidget *drawer = m_parameterDrawers[deviceId];
     if (!drawer) {
-        qDebug() << "[DeviceMonitor] 未找到参数抽屉，设备ID:" << deviceId;
         return;
     }
     
     QTableWidget *parameterTable = drawer->findChild<QTableWidget*>("parameterTable");
     if (!parameterTable) {
-        qDebug() << "[DeviceMonitor] 未找到参数表格，设备ID:" << deviceId;
         return;
     }
     
@@ -495,9 +479,6 @@ void DeviceMonitorPanel::updateParameterDrawer(const QString &deviceId)
         }
         
         if (valueItem) {
-            // 输出调试信息，显示当前参数值
-            qDebug() << "[DeviceMonitor] 更新参数:'" << param.name() << "' 值:" << displayValue;
-            
             valueItem->setText(QString::number(displayValue, 'f', 1));
             // 使用setForeground代替setStyleSheet
             QColor textColor;
@@ -512,7 +493,6 @@ void DeviceMonitorPanel::updateParameterDrawer(const QString &deviceId)
             valueItem->setForeground(QBrush(textColor));
         } else {
             // 如果表格项不存在，创建新的表格项
-            qDebug() << "[DeviceMonitor] 表格项不存在，创建新项，参数:'" << param.name() << "' 值:" << displayValue;
             valueItem = new QTableWidgetItem(QString::number(displayValue, 'f', 1));
             parameterTable->setItem(row, 1, valueItem);
             

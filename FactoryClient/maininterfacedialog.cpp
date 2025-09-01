@@ -3,6 +3,10 @@
 #include "mainwindow.h"
 #include "registerdialog.h"
 #include "devicemonitorpanel.h"
+#include "workorderdialog.h"
+#include "accountinfodialog.h"
+#include "chatdialog.h"
+#include "meetingdialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -23,10 +27,14 @@
 MainInterfaceDialog::MainInterfaceDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::MainInterfaceDialog)
+    , meetingDialog(nullptr)
 {
     ui->setupUi(this);
     setWindowTitle("工厂客户端 - 主界面");
     resize(1200, 800); // 设置默认窗口大小
+
+    // 避免主界面关闭时触发全局退出
+    setAttribute(Qt::WA_QuitOnClose, false);
 
     // 设置无边框窗口
     setWindowFlags(Qt::FramelessWindowHint);
@@ -235,14 +243,16 @@ void MainInterfaceDialog::createSidebar()
     connect(ui->textMessageButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_textMessageButton_clicked);
     communicationLayout->addWidget(ui->textMessageButton);
 
-    QPushButton* onlineMeetingButton = new QPushButton("在线会议", this);
-    onlineMeetingButton->setStyleSheet(
+
+    ui->joinMeetingButton = new QPushButton("在线会议", this);
+    ui->joinMeetingButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #e2e8f0; text-align: left; padding: 10px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #334155; }"
         "QPushButton:pressed { background-color: #475569; }"
         );
-    connect(onlineMeetingButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_onlineMeetingButton_clicked);
-    communicationLayout->addWidget(onlineMeetingButton);
+    connect(ui->joinMeetingButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_joinMeetingButton_clicked);
+    communicationLayout->addWidget(ui->joinMeetingButton);
+
 
     // 设备监控组
     QGroupBox *deviceMonitorGroupBox = new QGroupBox("设备监控", this);
@@ -380,61 +390,40 @@ QWidget *MainInterfaceDialog::createFeatureContentWidget(const QString &featureN
 
     // 根据功能名称设置内容
     if (featureName == "login") {
-        // 账号信息页面
-        QLabel *titleLabel = new QLabel("账号信息", this);
-        titleLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 20px;");
-        contentLayout->addWidget(titleLabel);
+        AccountInfoDialog *accountWidget = new AccountInfoDialog;
+        accountWidget->setUsername(m_username);
+        
+        // 连接退出登录信号
+        connect(accountWidget, &AccountInfoDialog::logoutRequested, this, [this]() {
+            // 1) 临时关闭"最后一个窗口关闭就退出"
+            const bool oldQuit = qApp->quitOnLastWindowClosed();
+            qApp->setQuitOnLastWindowClosed(false);
 
-        // 账号信息表单
-        QWidget *accountForm = new QWidget(this);
-        accountForm->setStyleSheet("background-color: #f8fafc; border-radius: 8px; padding: 20px;");
-        QVBoxLayout *formLayout = new QVBoxLayout(accountForm);
-
-        // 用户名
-        QHBoxLayout *usernameLayout = new QHBoxLayout();
-        QLabel *usernameLabel = new QLabel("用户名:", this);
-        usernameLabel->setStyleSheet("font-size: 14px; color: #475569; width: 100px;");
-        QLabel *usernameValueLabel = new QLabel("demo_user", this);
-        usernameValueLabel->setStyleSheet("font-size: 14px; color: #1e293b;");
-        usernameLayout->addWidget(usernameLabel);
-        usernameLayout->addWidget(usernameValueLabel);
-        usernameLayout->addStretch();
-        formLayout->addLayout(usernameLayout);
-
-        // 密码
-        QHBoxLayout *passwordLayout = new QHBoxLayout();
-        QLabel *passwordLabel = new QLabel("密码:", this);
-        passwordLabel->setStyleSheet("font-size: 14px; color: #475569; width: 100px;");
-        QLabel *passwordValueLabel = new QLabel("********", this);
-        passwordValueLabel->setStyleSheet("font-size: 14px; color: #1e293b;");
-        passwordLayout->addWidget(passwordLabel);
-        passwordLayout->addWidget(passwordValueLabel);
-        passwordLayout->addStretch();
-        formLayout->addLayout(passwordLayout);
-
-        formLayout->addSpacing(20);
-
-        // 退出登录按钮
-        QPushButton *logoutButton = new QPushButton("退出登录", this);
-        logoutButton->setStyleSheet(
-            "QPushButton { background-color: #ef4444; color: white; font-size: 14px; padding: 10px 20px; border-radius: 4px; border: none; }"
-            "QPushButton:hover { background-color: #dc2626; }"
-            "QPushButton:pressed { background-color: #b91c1c; }"
-            );
-        connect(logoutButton, &QPushButton::clicked, this, [=]() {
-            // 隐藏当前窗口
-            this->hide();
-            // 创建并显示登录窗口
-            MainWindow *loginWindow = new MainWindow(nullptr);
+            // 2) 先创建并显示登录窗口（一定要是顶层：parent = nullptr）
+            MainWindow* loginWindow = new MainWindow(nullptr);
+            loginWindow->setAttribute(Qt::WA_DeleteOnClose);
             loginWindow->show();
+            loginWindow->raise();
+            loginWindow->activateWindow();
+
+            // 3) 下一轮事件循环里再关闭当前主界面
+            QTimer::singleShot(0, this, [this, oldQuit]{
+                this->close(); // 或 this->deleteLater();
+                // 4) 恢复原来的 quitOnLastWindowClosed
+                qApp->setQuitOnLastWindowClosed(oldQuit);
+            });
+        });
+        
+        // 其他信号暂时不实现具体功能
+        connect(accountWidget, &AccountInfoDialog::profileEditRequested, this, []() {
+            // 个人资料编辑功能暂未实现
+        });
+        
+        connect(accountWidget, &AccountInfoDialog::passwordChangeRequested, this, []() {
+            // 修改密码功能暂未实现
         });
 
-        QHBoxLayout *buttonLayout = new QHBoxLayout();
-        buttonLayout->addStretch();
-        buttonLayout->addWidget(logoutButton);
-        formLayout->addLayout(buttonLayout);
-
-        contentLayout->addWidget(accountForm);
+        contentLayout->addWidget(accountWidget, 1);
     } else if (featureName == "realTimeData") {
         // 实时设备数据监控 - 使用设备监控面板
         DeviceMonitorPanel *monitorPanel = new DeviceMonitorPanel(this);
@@ -445,7 +434,183 @@ QWidget *MainInterfaceDialog::createFeatureContentWidget(const QString &featureN
         applyDeviceDataCache();
 
         // 不添加addStretch，让DeviceMonitorPanel完全占满
-    } else if (featureName == "newWorkOrder") {
+    }
+    else if (featureName == "joinMeeting") {
+        // 加入会议页面 - 创建会议功能界面
+        QLabel *titleLabel = new QLabel("远程会议功能", this);
+        titleLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 20px;");
+        contentLayout->addWidget(titleLabel);
+
+        // 会议控制面板
+        QWidget *meetingPanel = new QWidget(this);
+        meetingPanel->setStyleSheet("background-color: #f8fafc; border-radius: 8px; padding: 20px;");
+        QVBoxLayout *panelLayout = new QVBoxLayout(meetingPanel);
+
+        // 会议状态显示
+        QLabel *statusLabel = new QLabel("会议状态: 未连接", this);
+        statusLabel->setStyleSheet("font-size: 14px; color: #475569; margin-bottom: 15px;");
+        panelLayout->addWidget(statusLabel);
+
+        // 按钮区域
+        QHBoxLayout *buttonLayout = new QHBoxLayout();
+
+        // 创建会议按钮
+        QPushButton *createMeetingBtn = new QPushButton("创建会议", this);
+        createMeetingBtn->setStyleSheet(
+            "QPushButton { background-color: #3b82f6; color: white; font-size: 14px; padding: 10px 20px; border-radius: 4px; border: none; }"
+            "QPushButton:hover { background-color: #2563eb; }"
+            "QPushButton:pressed { background-color: #1d4ed8; }"
+            );
+
+        // 打开独立会议窗口按钮
+        QPushButton *openMeetingWindowBtn = new QPushButton("加入会议", this);
+        openMeetingWindowBtn->setStyleSheet(
+            "QPushButton { background-color: #8b5cf6; color: white; font-size: 14px; padding: 10px 20px; border-radius: 4px; border: none; }"
+            "QPushButton:hover { background-color: #7c3aed; }"
+            "QPushButton:pressed { background-color: #6d28d9; }"
+            );
+
+        // 连接打开独立窗口按钮
+        connect(openMeetingWindowBtn, &QPushButton::clicked, this, [=]() {
+            // 创建输入对话框
+            QDialog *inputDialog = new QDialog(this);
+            inputDialog->setWindowTitle("加入会议");
+            inputDialog->setModal(true);
+            inputDialog->resize(400, 200);
+
+            QVBoxLayout *dialogLayout = new QVBoxLayout(inputDialog);
+
+            // 标题
+            QLabel *dialogTitle = new QLabel("请输入会议服务器信息", inputDialog);
+            dialogTitle->setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 20px;");
+            dialogLayout->addWidget(dialogTitle);
+
+            // 服务器地址输入
+            QHBoxLayout *serverLayout = new QHBoxLayout();
+            QLabel *serverLabel = new QLabel("服务器地址:", inputDialog);
+            QLineEdit *serverEdit = new QLineEdit(inputDialog);
+            serverEdit->setPlaceholderText("例如: localhost 或 192.168.1.100");
+            serverEdit->setText("localhost"); // 默认值
+            serverLayout->addWidget(serverLabel);
+            serverLayout->addWidget(serverEdit);
+            dialogLayout->addLayout(serverLayout);
+
+            // 端口输入
+            QHBoxLayout *portLayout = new QHBoxLayout();
+            QLabel *portLabel = new QLabel("端口号:", inputDialog);
+            QLineEdit *portEdit = new QLineEdit(inputDialog);
+            portEdit->setPlaceholderText("例如: 12347");
+            portEdit->setText("12347"); // 默认值
+            portLayout->addWidget(portLabel);
+            portLayout->addWidget(portEdit);
+            dialogLayout->addLayout(portLayout);
+
+            // 会议ID输入（可选）
+            QHBoxLayout *meetingIdLayout = new QHBoxLayout();
+            QLabel *meetingIdLabel = new QLabel("会议ID:", inputDialog);
+            QLineEdit *meetingIdEdit = new QLineEdit(inputDialog);
+            meetingIdEdit->setPlaceholderText("可选: 输入会议ID");
+            meetingIdLayout->addWidget(meetingIdLabel);
+            meetingIdLayout->addWidget(meetingIdEdit);
+            dialogLayout->addLayout(meetingIdLayout);
+
+            // 按钮区域
+            QHBoxLayout *buttonDialogLayout = new QHBoxLayout();
+            QPushButton *cancelBtn = new QPushButton("取消", inputDialog);
+            QPushButton *confirmBtn = new QPushButton("确认加入", inputDialog);
+
+            cancelBtn->setStyleSheet("padding: 8px 16px;");
+            confirmBtn->setStyleSheet(
+                "QPushButton { background-color: #10b981; color: white; padding: 8px 16px; border-radius: 4px; }"
+                "QPushButton:hover { background-color: #059669; }"
+                );
+
+            buttonDialogLayout->addStretch();
+            buttonDialogLayout->addWidget(cancelBtn);
+            buttonDialogLayout->addWidget(confirmBtn);
+            dialogLayout->addLayout(buttonDialogLayout);
+
+            // 连接按钮信号
+            connect(cancelBtn, &QPushButton::clicked, inputDialog, &QDialog::reject);
+            connect(confirmBtn, &QPushButton::clicked, inputDialog, [=]() {
+                QString server = serverEdit->text().trimmed();
+                QString portStr = portEdit->text().trimmed();
+                QString meetingId = meetingIdEdit->text().trimmed();
+
+                if (server.isEmpty()) {
+                    QMessageBox::warning(inputDialog, "输入错误", "服务器地址不能为空");
+                    return;
+                }
+
+                if (portStr.isEmpty()) {
+                    QMessageBox::warning(inputDialog, "输入错误", "端口号不能为空");
+                    return;
+                }
+
+                bool ok;
+                int port = portStr.toInt(&ok);
+                if (!ok || port < 1 || port > 65535) {
+                    QMessageBox::warning(inputDialog, "输入错误", "请输入有效的端口号 (1-65535)");
+                    return;
+                }
+
+                inputDialog->accept();
+
+                // 创建并显示独立的会议对话框，传入服务器信息
+                if (!meetingDialog) {
+                    meetingDialog = new MeetingDialog("factory_user", server, port, meetingId, this);
+                    connect(meetingDialog, &MeetingDialog::meetingClosed, this, [=]() {
+                        meetingDialog->deleteLater();
+                        meetingDialog = nullptr;
+                    });
+                }
+                meetingDialog->show();
+                meetingDialog->raise();
+                meetingDialog->activateWindow();
+            });
+
+            // 显示对话框
+            if (inputDialog->exec() == QDialog::Accepted) {
+                statusLabel->setText("会议状态: 已打开独立会议窗口");
+            }
+        });
+
+        buttonLayout->addWidget(createMeetingBtn);
+        buttonLayout->addWidget(openMeetingWindowBtn);
+        buttonLayout->addStretch();
+
+        panelLayout->addLayout(buttonLayout);
+
+        // 会议信息区域
+        QGroupBox *infoGroup = new QGroupBox("会议信息", this);
+        infoGroup->setStyleSheet("QGroupBox { font-weight: bold; margin-top: 15px; }");
+        QVBoxLayout *infoLayout = new QVBoxLayout(infoGroup);
+
+        QLabel *infoLabel = new QLabel(
+            "功能说明:\n"
+            "• 创建会议: 发起一个新的远程会议会话\n"
+            "• 加入会议: 通过会议ID加入现有会议\n"
+            "• 打开独立窗口: 在独立窗口中运行完整会议功能\n\n"
+            "会议功能包括:\n"
+            "• 实时音视频通话\n"
+            "• 文字聊天\n"
+            "• 屏幕共享\n"
+            "• 文件传输", this);
+        infoLabel->setStyleSheet("font-size: 12px; color: #64748b;");
+        infoLabel->setWordWrap(true);
+
+        infoLayout->addWidget(infoLabel);
+        panelLayout->addWidget(infoGroup);
+
+        contentLayout->addWidget(meetingPanel);
+
+        // 连接按钮信号：创建会议
+        connect(createMeetingBtn, &QPushButton::clicked, this, [=]() {
+            statusLabel->setText("会议状态: 正在创建会议...");
+            QMessageBox::information(this, "创建会议", "会议创建功能正在开发中");
+        });
+    }else if (featureName == "newWorkOrder") {
+
         QLabel *title = new QLabel("新建工单", this);
         title->setStyleSheet("font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 20px;");
         contentLayout->addWidget(title);
@@ -486,7 +651,53 @@ QWidget *MainInterfaceDialog::createFeatureContentWidget(const QString &featureN
         connect(btn, &QPushButton::clicked, this, &MainInterfaceDialog::onCreateTicketClicked);
 
         contentLayout->addWidget(form);
-    }else {
+    }else if (featureName == "newWorkOrder") {
+        // 使用独立的WorkOrderDialog类
+        WorkOrderDialog *workOrderDialog = new WorkOrderDialog(this);
+        m_workOrderDialog = workOrderDialog; // 保存引用
+        
+        // 连接创建工单信号
+        connect(workOrderDialog, &WorkOrderDialog::createTicket, this, &MainInterfaceDialog::onCreateTicketClicked);
+        
+        contentLayout->addWidget(workOrderDialog);
+    } else if (featureName == "textMessage") {
+        // 联系专家 - 聊天界面
+        ChatDialog *chatDialog = new ChatDialog(this);
+        m_chatDialog = chatDialog; // 保存引用
+        
+        // 设置连接信息
+        if (m_socket) {
+            chatDialog->setConnection(m_socket, m_username);
+        }
+        
+        // 连接聊天相关信号
+        connect(chatDialog, &ChatDialog::joinChatRequested, this, [this](const QString& workOrderId) {
+            // 发送加入聊天请求到服务器
+            if (m_socket && m_socket->isOpen()) {
+                QString request = QString("ORDER|JOIN|%1\n").arg(workOrderId);
+                m_socket->write(request.toUtf8());
+                m_socket->flush();
+            }
+        });
+        
+        connect(chatDialog, &ChatDialog::messageSent, this, [this](const QString& workOrderId, const QString& message) {
+            // 发送消息到服务器，使用与专家端一致的格式
+            if (m_socket && m_socket->isOpen()) {
+                // 移除消息中的换行符，替换竖线符号
+                QString safeMessage = message.trimmed();
+                safeMessage.replace('\n', ' ').replace('\r', ' ').replace('|', QChar(0xFF5C));
+                
+                // 使用专家端的格式：CHAT|SEND|工单ID|用户名|消息内容
+                QString request = QString("CHAT|SEND|%1|%2|%3\n").arg(workOrderId, m_username, safeMessage);
+                m_socket->write(request.toUtf8());
+                m_socket->flush();
+                
+                // 不再在本地立即添加消息，等待服务器返回确认后再显示
+            }
+        });
+        
+        contentLayout->addWidget(chatDialog, 1);
+    } else {
         // 其他功能页面
         QLabel *titleLabel = new QLabel(displayName, this);
         titleLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 20px;");
@@ -533,9 +744,9 @@ void MainInterfaceDialog::on_textMessageButton_clicked()
     createAndShowFeaturePage("textMessage", "联系专家");
 }
 
-void MainInterfaceDialog::on_onlineMeetingButton_clicked()
+void MainInterfaceDialog::on_joinMeetingButton_clicked()
 {
-    createAndShowFeaturePage("onlineMeeting", "在线会议");
+    createAndShowFeaturePage("joinMeeting", "在线会议");
 }
 
 void MainInterfaceDialog::on_deviceMonitorButton_clicked()
@@ -607,16 +818,8 @@ void MainInterfaceDialog::setConnection(QTcpSocket* socket, const QString& usern
     m_username = username;
     if (!m_socket) return;
 
-    qDebug() << "[Factory] setConnection called, socket=" << socket 
-             << " state=" << socket->state() 
-             << " localPort=" << socket->localPort() 
-             << " peer=" << socket->peerAddress().toString() << ":" << socket->peerPort() 
-             << " signalsBlocked=" << m_socket->signalsBlocked() 
-             << " sockThread=" << m_socket->thread() << " guiThread=" << qApp->thread(); 
-
     // 若不在 GUI 线程，移回 GUI 线程（防止所在线程没有事件循环导致 readyRead 不触发）
     if (m_socket->thread() != qApp->thread()) {
-        qDebug() << "[Factory] moving socket to GUI thread";
         m_socket->moveToThread(qApp->thread());
     }
 
@@ -625,21 +828,19 @@ void MainInterfaceDialog::setConnection(QTcpSocket* socket, const QString& usern
 
     // 直连 readyRead，并强制调用本类的槽
     connect(m_socket, &QTcpSocket::readyRead, this, [this]{
-        qDebug() << "[Factory] readyRead fired (probe), bytes=" << m_socket->bytesAvailable();
         this->onSocketReadyRead();
     }, static_cast<Qt::ConnectionType>(Qt::DirectConnection | Qt::UniqueConnection));
 
     // 可选：监听状态/错误
-    connect(m_socket, &QTcpSocket::stateChanged, this, [](QAbstractSocket::SocketState st){
-        qDebug() << "[Factory] stateChanged:" << st;
+    connect(m_socket, &QTcpSocket::stateChanged, this, [](QAbstractSocket::SocketState){
+        // 移除了状态调试输出
     });
-    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred),
-            this, [](auto e){ qDebug() << "[Factory] socket error:" << e; });
+    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::error),
+            this, [](auto){ /* 移除了错误调试输出 */ });
 
     // 1秒后发一条测试命令
     QTimer::singleShot(1000, this, [this]{
         if (m_socket && m_socket->state() == QAbstractSocket::ConnectedState) {
-            qDebug() << "[Factory] send test ping";
             m_socket->write("PING|TEST\n");
             m_socket->flush();
         }
@@ -651,12 +852,9 @@ void MainInterfaceDialog::setConnection(QTcpSocket* socket, const QString& usern
         if (m_socket->bytesAvailable()==0) m_socket->waitForReadyRead(500);
         QByteArray all = m_socket->readAll();
         if (!all.isEmpty()) {
-            qDebug() << "[Factory] polled bytes:" << all;
             m_recvBuf += all;
             // 复用 onSocketReadyRead 的逐行解析逻辑
             this->onSocketReadyRead();
-        } else {
-            qDebug() << "[Factory] poll got nothing, bytes=" << m_socket->bytesAvailable();
         }
     });
 
@@ -690,18 +888,22 @@ void MainInterfaceDialog::onSocketReadyRead() {
         const QString line = QString::fromUtf8(one).trimmed();
         if (line.isEmpty()) continue;
 
-        qDebug() << "[Factory] recv:" << line;
         const QStringList p = line.split('|');
         if (p.size() < 2) continue;
         const QString type = p[0];
 
         if (type == "CREATE_TICKET") {
-            // 你的原逻辑...
+            // 处理服务端返回的CREATE_TICKET响应
+            if (p.size() >= 2 && p[1] == "SUCCESS") {
+                const QString id = p.size() >= 3 ? p[2] : "";
+                // 总是显示消息框通知用户工单创建成功
+                QMessageBox::information(this, "创建成功", QString("工单编号: %1").arg(id));
+            }
         } else if (type == "ORDER" && p.size() >= 4 && p[1] == "ACCEPTED") {
             // 你的原逻辑...
         } else if (type == "TICKET_CREATED") {
+            // 保留原有的TICKET_CREATED处理逻辑，以兼容可能的其他来源
             const QString id = (p.size()>=3 && p[1]=="SUCCESS") ? p[2] : (p.size()>=2 ? p[1] : "");
-            if (newResultLabel_) newResultLabel_->setText(QString("工单创建成功，编号: %1").arg(id));
             QMessageBox::information(this, "创建成功", QString("工单编号: %1").arg(id));
         } else if (type == "DEVICE_DATA" && p.size() >= 8) {
             const QString deviceId = "device_001";
@@ -710,12 +912,10 @@ void MainInterfaceDialog::onSocketReadyRead() {
                                     p[4].toDouble(), p[5].toDouble(), p[6].toDouble(), p[7].toInt());
         } else if (type == "TELE" && p.size() >= 4 && p[1] == "DATA") {
             const QString jsonData = p.mid(3).join("|"); // 兼容 JSON 中出现 '|' 的情况
-            qDebug() << "[Factory] TELE json:" << jsonData;
 
             QJsonParseError err;
             const auto doc = QJsonDocument::fromJson(jsonData.toUtf8(), &err);
             if (err.error != QJsonParseError::NoError || !doc.isObject()) {
-                qDebug() << "[Factory] JSON解析错误:" << err.errorString();
                 continue;
             }
             const QJsonObject obj = doc.object();
@@ -734,6 +934,42 @@ void MainInterfaceDialog::onSocketReadyRead() {
                                     num("voltage"),
                                     num("speed"),
                                     obj.contains("status") ? obj["status"].toInt(1) : 1);
+        } else if (type == "ORDER" && p.size() >= 3 && p[1] == "JOIN") {
+            // 处理加入聊天的响应
+            if (p.size() >= 3 && p[2] == "OK" && p.size() >= 4) {
+                // 加入聊天成功
+                const QString workOrderId = p[3];
+                if (m_chatDialog) {
+                    m_chatDialog->showChatSuccess(workOrderId);
+                }
+            } else if (p.size() >= 3 && p[2] == "ERR" && p.size() >= 4) {
+                // 加入聊天失败
+                const QString errorMessage = p[3];
+                if (m_chatDialog) {
+                    m_chatDialog->showChatError(errorMessage);
+                }
+            }
+        } else if (type == "MESSAGE" && p.size() >= 4 && p[1] == "RECEIVE") {
+            // 处理收到的消息（旧格式，保持兼容）
+            if (p.size() >= 5) {
+                const QString workOrderId = p[2];
+                const QString sender = p[3];
+                const QString message = p.mid(4).join("|"); // 兼容消息中出现 '|' 的情况
+                if (m_chatDialog) {
+                    m_chatDialog->appendMessage(sender, message, false);
+                }
+            }
+        } else if (type == "CHAT" && p.size() >= 5 && p[1] == "MSG") {
+            // 处理专家端格式的消息
+            if (p.size() >= 6) {
+                const QString workOrderId = p[2];
+                const QString sender = p[3];
+                // 跳过时间戳 p[4]
+                const QString message = p.mid(5).join("|"); // 兼容消息中出现 '|' 的情况
+                if (m_chatDialog) {
+                    m_chatDialog->appendMessage(sender, message, false);
+                }
+            }
         }
     }
 }
@@ -743,26 +979,31 @@ void MainInterfaceDialog::onCreateTicketClicked() {
         QMessageBox::warning(this, "未连接", "尚未连接到服务器");
         return;
     }
-    const QString title = newTitleEdit_ ? newTitleEdit_->text().trimmed() : QString();
-    const QString desc  = newDescEdit_  ? newDescEdit_->toPlainText().trimmed() : QString();
-    const QString prio  = newPrioBox_   ? newPrioBox_->currentText() : "中";
+    
+    // 从WorkOrderDialog获取工单信息
+    if (!m_workOrderDialog) {
+        QMessageBox::warning(this, "错误", "工单对话框未初始化");
+        return;
+    }
+    
+    const QString title = m_workOrderDialog->getTitle().trimmed();
+    const QString desc = m_workOrderDialog->getDescription().trimmed();
+    const QString prio = m_workOrderDialog->getPriority();
+    
     if (title.isEmpty() || desc.isEmpty()) {
         QMessageBox::warning(this, "提示", "请填写标题和描述");
         return;
     }
+    
     auto sanitize = [](QString s){ s.replace("\n"," ").replace("\r"," ").replace("|"," "); return s; };
     const QString line = QString("CREATE_TICKET|%1|%2|%3")
                              .arg(sanitize(title), sanitize(desc), sanitize(prio));
     m_socket->write(line.toUtf8() + '\n');
     m_socket->flush();
-    if (newResultLabel_) newResultLabel_->setText("已发送创建请求...");
 }
 
 void MainInterfaceDialog::updateDeviceMonitorData(const QString &deviceId, double temperature, double pressure, double vibration, double current, double voltage, double speed, int status){
-    qDebug() << "[Factory] 接收到设备数据更新 - ID:" << deviceId << ", 温度:" << temperature << ", 压力:" << pressure;
-    
     if (!m_deviceMonitorPanel) {
-        qDebug() << "[Factory] 监控面板未初始化，将数据缓存";
         // 缓存数据
         DeviceParams params;
         params.temperature = temperature;
@@ -820,8 +1061,6 @@ void MainInterfaceDialog::applyDeviceDataCache() {
     if (!m_deviceMonitorPanel || m_deviceDataCache.isEmpty()) {
         return;
     }
-    
-    qDebug() << "[Factory] 应用缓存的设备数据，条目数:" << m_deviceDataCache.size();
     
     // 遍历缓存的所有设备数据并应用
     for (auto it = m_deviceDataCache.constBegin(); it != m_deviceDataCache.constEnd(); ++it) {

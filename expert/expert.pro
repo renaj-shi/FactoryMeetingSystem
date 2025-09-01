@@ -1,14 +1,13 @@
 TEMPLATE = app
 TARGET = ExpertClientChat
 
-QT += core gui widgets network charts
+QT += core gui widgets network charts multimedia multimediawidgets
 CONFIG += c++17
 
 SOURCES += \
     chatclient.cpp \
-    knowledgeclient.cpp \
-    knowledgeviewdialog.cpp \
     main.cpp \
+    meetingdialog.cpp \
     tcpclient.cpp \
     authmanager.cpp \
     ticketsclient.cpp \
@@ -17,12 +16,13 @@ SOURCES += \
     telemetryclient.cpp \
     logindialog.cpp \
     sessionwidget.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    audioprocessor.cpp \
+    videoprocessor.cpp
 
 HEADERS += \
     chatclient.h \
-    knowledgeclient.h \
-    knowledgeviewdialog.h \
+    meetingdialog.h \
     tcpclient.h \
     authmanager.h \
     ticketsclient.h \
@@ -31,10 +31,13 @@ HEADERS += \
     telemetryclient.h \
     logindialog.h \
     sessionwidget.h \
-    mainwindow.h
+    mainwindow.h \
+    audioprocessor.h \
+    videoprocessor.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    meetingdialog.ui
 
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin

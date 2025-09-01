@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>WorkOrderDialog</class>
+ <widget class="QWidget" name="WorkOrderDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>600</width>
+    <height>450</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>新建工单</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color:#ffffff; border-radius:8px; padding:20px;</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="contentsMargins">
+    <set>0, 0, 0, 0</set>
+   </property>
+   <item>
+    <widget class="QLabel" name="titleLabel">
+     <property name="text">
+      <string>工单标题</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">font-size: 14px; color: #475569;</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="titleEdit">
+     <property name="placeholderText">
+      <string>请输入工单标题</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLineEdit { border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; font-size: 14px; color: #1e293b; background-color: #ffffff; }
+QLineEdit:focus { border-color: #3b82f6; outline: none; }</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>15</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QLabel" name="descLabel">
+     <property name="text">
+      <string>问题描述</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">font-size: 14px; color: #475569;</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="descEdit">
+     <property name="placeholderText">
+      <string>请详细描述问题现象</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QTextEdit { border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; font-size: 14px; color: #1e293b; background-color: #ffffff; min-height: 100px; }
+QTextEdit:focus { border-color: #3b82f6; outline: none; }</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="charCountLabel">
+     <property name="text">
+      <string>0/500</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">font-size: 12px; color: #94a3b8;</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>15</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QLabel" name="priorityLabel">
+     <property name="text">
+      <string>优先级</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">font-size: 14px; color: #475569;</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="priorityLayout">
+     <property name="contentsMargins">
+      <set>0, 0, 0, 0</set>
+     </property>
+     <item>
+      <widget class="QRadioButton" name="highPriorityBtn">
+       <property name="text">
+        <string>高</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QRadioButton { font-size: 14px; color: #1e293b; spacing: 5px; }
+QRadioButton::indicator { width: 16px; height: 16px; }</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="mediumPriorityBtn">
+       <property name="text">
+        <string>中</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QRadioButton { font-size: 14px; color: #1e293b; spacing: 5px; }
+QRadioButton::indicator { width: 16px; height: 16px; }</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="lowPriorityBtn">
+       <property name="text">
+        <string>低</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QRadioButton { font-size: 14px; color: #1e293b; spacing: 5px; }
+QRadioButton::indicator { width: 16px; height: 16px; }</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_3">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="createButton">
+       <property name="text">
+        <string>生成工单</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton { background-color: #3b82f6; color: white; font-size: 14px; padding: 10px 24px; border-radius: 4px; border: none; }
+QPushButton:hover { background-color: #2563eb; }
+QPushButton:pressed { background-color: #1d4ed8; }
+QPushButton:disabled { background-color: #94a3b8; }</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="resultLabel">
+       <property name="text">
+        <string/>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">color:#0ea5e9;</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

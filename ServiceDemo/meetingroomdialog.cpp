@@ -1,5 +1,6 @@
 #include "meetingroomdialog.h"
 #include "ui_meetingroomdialog.h"
+#include "audioprocessor.h"
 #include <QMessageBox>
 #include <QDateTime>
 #include <QScrollBar>
@@ -8,6 +9,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
+#include <QFileDialog>  
+#include <QBuffer>       
+#include <QImage>        
+#include <QPixmap>
 
 MeetingRoomDialog::MeetingRoomDialog(QWidget *parent) :
     QDialog(parent),
@@ -19,6 +24,7 @@ MeetingRoomDialog::MeetingRoomDialog(QWidget *parent) :
 
     // 连接信号槽
     connect(meetingServer, &QTcpServer::newConnection, this, &MeetingRoomDialog::onNewConnection);
+    connect(ui->sendImageButton, &QPushButton::clicked, this, &MeetingRoomDialog::on_sendImageButton_clicked);
 
     // 设置界面初始状态
     ui->statusLabel->setText("会议室未启动");
@@ -219,8 +225,24 @@ void MeetingRoomDialog::handleChatMessage(QTcpSocket* socket, const QJsonObject&
         QString user = json["user"].toString();
 
         // 广播给所有用户
-        broadcastMessage(json, socket);
+        broadcastMessage(json, nullptr);
         addChatMessage(user, message, timestamp);
+    }
+        else if (type == "image_message") {
+        // 图片消息
+        QString timestamp = json["timestamp"].toString();
+        QString user = json["user"].toString();
+        QString imageData = json["image_data"].toString();
+
+        QString formattedMessage = QString("<br><b>%1</b>: <img src='data:image/png;base64,%2' style='max-width:200px;max-height:200px;' /><br>")
+                               .arg(user).arg(imageData);
+    ui->chatTextEdit->insertHtml(formattedMessage);
+        
+        // 记录系统消息
+        addSystemMessage(QString("用户 %1 发送了一张图片").arg(user));
+        
+        // 广播给所有用户
+        broadcastMessage(json, nullptr);
     }
     else if (type == "leave_meeting") {
         // 用户离开会议室
@@ -228,12 +250,6 @@ void MeetingRoomDialog::handleChatMessage(QTcpSocket* socket, const QJsonObject&
     }
 }
 
-void MeetingRoomDialog::handleAudioData(QTcpSocket* socket, const QByteArray& data)
-{
-    QString username = clientUsers.value(socket, "未知用户");
-    broadcastToAll(data, "AUDIO:", socket);
-    addSystemMessage(QString("%1 发送了语音消息").arg(username));
-}
 
 void MeetingRoomDialog::handleImageData(QTcpSocket* socket, const QByteArray& data)
 {
@@ -360,4 +376,75 @@ void MeetingRoomDialog::on_startMeetingButton_clicked()
     } else {
         qDebug() << "会议服务器启动失败";
     }
+}
+
+void MeetingRoomDialog::on_sendImageButton_clicked()
+{
+    // 打开文件选择对话框选择图片
+    QString imagePath = QFileDialog::getOpenFileName(this, "选择图片", "", 
+        "图片文件 (*.png *.jpg *.jpeg *.bmp *.gif)");
+    
+    if (!imagePath.isEmpty()) {
+        sendImageFromServer(imagePath);
+    }
+}
+
+void MeetingRoomDialog::sendImageFromServer(const QString &imagePath)
+{
+    QPixmap pixmap(imagePath);
+    if (pixmap.isNull()) {
+        QMessageBox::warning(this, "错误", "无法加载图片");
+        return;
+    }
+
+    // 限制图片大小
+    QPixmap scaledPixmap = pixmap.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    QByteArray byteArray;
+    QBuffer buffer(&byteArray);
+    buffer.open(QIODevice::WriteOnly);
+    scaledPixmap.save(&buffer, "PNG");
+
+    // 转换为Base64编码
+    QByteArray base64Data = byteArray.toBase64();
+
+    // 创建图片消息
+    QJsonObject json;
+    json["type"] = "image_message";
+    json["user"] = "系统管理员";
+    json["timestamp"] = QDateTime::currentDateTime().toString("hh:mm:ss");
+    json["image_data"] = QString(base64Data);
+
+    // 广播图片消息给所有客户端
+    broadcastMessage(json);
+
+    // 在服务端本地显示发送的图片
+    QString formattedMessage = QString("<br><b>系统管理员</b>: <img src='data:image/png;base64,%1' style='max-width:200px;max-height:200px;' /><br>")
+                              .arg(QString(base64Data));
+    ui->chatTextEdit->insertHtml(formattedMessage);
+    
+    // 滚动到底部
+    QScrollBar *scrollbar = ui->chatTextEdit->verticalScrollBar();
+    scrollbar->setValue(scrollbar->maximum());
+    
+    addSystemMessage("系统管理员发送了一张图片");
+}
+
+void MeetingRoomDialog::handleAudioData(QTcpSocket* socket, const QByteArray& data)
+{
+    QString username = clientUsers.value(socket, "未知用户");
+    
+    // 转发音频数据给其他客户端
+    QByteArray audioData = QByteArray::fromBase64(data);
+    
+    // 创建音频消息
+    QJsonObject json;
+    json["type"] = "audio_message";
+    json["user"] = username;
+    json["audio_data"] = QString(data); // data已经是base64编码的
+    
+    // 广播给其他用户（除了发送者）
+    broadcastMessage(json, socket);
+    
+    // 在服务端记录
 }

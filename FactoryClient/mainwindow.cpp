@@ -66,7 +66,7 @@ void MainWindow::setupConnection()
     connect(tcpSocket, &QTcpSocket::connected, this, &MainWindow::onConnected);
     connect(tcpSocket, &QTcpSocket::readyRead, this, &MainWindow::onReadyRead);
     connect(tcpSocket, &QTcpSocket::disconnected, this, &MainWindow::onDisconnected);
-    connect(tcpSocket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred),
+    connect(tcpSocket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::error),
             this, &MainWindow::onError);
 }
 
@@ -131,7 +131,6 @@ void MainWindow::onReadyRead()
 {
     while (tcpSocket->canReadLine()) {
         QString response = QString::fromUtf8(tcpSocket->readLine()).trimmed();
-        qDebug() << "服务器响应:" << response;
 
         QStringList parts = response.split("|");
         if (parts.size() < 2) {
@@ -160,47 +159,34 @@ void MainWindow::onReadyRead()
                     registerDialog->onRegisterError(errorMsg);
                 }
             }
-        }
+        }        
         else if (type == "LOGIN") {
-            qDebug() << "[Login] 接收到LOGIN响应，status=" << status;
             if (status == "SUCCESS") {
                 statusBar()->showMessage("登录成功");
-                qDebug() << "[Login] 登录成功，准备创建主界面，m_username=" << m_username;
                 
                 // 断开socket的readyRead信号连接，避免登录窗口继续读取数据
                 disconnect(tcpSocket, &QTcpSocket::readyRead, this, &MainWindow::onReadyRead);
-                qDebug() << "[Login] 已断开登录窗口的readyRead信号连接";
 
                 // 创建主界面
                 MainInterfaceDialog *mainInterface = new MainInterfaceDialog(nullptr);
-                qDebug() << "[Login] 已创建MainInterfaceDialog实例";
                 
                 // 设置主界面的属性，确保关闭时自动销毁
                 mainInterface->setAttribute(Qt::WA_DeleteOnClose);
-                qDebug() << "[Login] 已设置WA_DeleteOnClose属性";
                 
                 // 将socket的父对象设置为主界面，保证登录窗口关闭后socket仍在
                 tcpSocket->setParent(mainInterface);
-                qDebug() << "[Login] 已将socket的父对象设置为主界面";
                 
                 // 将socket注入到主界面
-                qDebug() << "[Login] 准备调用setConnection方法";
                 mainInterface->setConnection(tcpSocket, m_username);
-                qDebug() << "[Login] 已调用setConnection方法";
 
                 // 清空当前窗口的socket指针
                 this->hide();
                 tcpSocket = nullptr;
-                qDebug() << "[Login] 已隐藏登录窗口，tcpSocket置为nullptr";
 
-                // 使用 exec() 模态显示，并处理后续逻辑
-                mainInterface->exec();
-                qDebug() << "[Login] 主界面已关闭";
-
-                // 退出整个应用程序
-                qApp->quit();
+                // 非模态显示主界面
+                mainInterface->show();
                 
-                return; // 确保执行完退出逻辑后函数返回
+                return; // 确保执行完逻辑后函数返回
 
             } else {
                 QString errorMsg = parts.size() > 2 ? parts[2] : "未知错误";

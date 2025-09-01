@@ -1,4 +1,4 @@
-QT       += core gui sql network charts serialport widgets
+QT       += core gui sql network charts serialport widgets multimedia multimediawidgets
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -14,14 +14,20 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     meetingroomdialog.cpp \
-    ticketsdialog.cpp
+    ticketsdialog.cpp \
+    audioprocessor.cpp \
+    videoprocessor.cpp
+
+
 
 HEADERS += \
     devicedialog.h \
     deviceworker.h \
     mainwindow.h \
     meetingroomdialog.h \
-    ticketsdialog.h
+    ticketsdialog.h \
+    audioprocessor.h \
+    videoprocessor.h
 
 FORMS += \
     devicedialog.ui \

@@ -80,6 +80,11 @@ private:
     void broadcastChat(const QString& orderId, const QString& from, const QString& text);
     void processLine(QTcpSocket* socket, const QString& line);
 
+    // 历史工单（简化知识库）查询接口
+    void handleTicketsList(QTcpSocket* socket, int page, int pageSize);
+    void handleTicketLogs(QTcpSocket* socket, int ticketId, int page, int pageSize);
+    void handleFaultsByTicket(QTcpSocket* socket, int ticketId, int page, int pageSize);
+
 private:
     Ui::MainWindow *ui{nullptr};
     QTcpServer *factoryServer{nullptr};
