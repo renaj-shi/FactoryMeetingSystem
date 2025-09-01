@@ -38,6 +38,9 @@ private slots:
     void on_kickButton_clicked();
     void on_closeMeetingButton_clicked();
     void on_startMeetingButton_clicked();
+    void on_sendImageButton_clicked();
+    void sendImageFromServer(const QString &imagePath);
+    void handleAudioData(QTcpSocket* socket, const QByteArray& data);
 
 private:
     Ui::MeetingRoomDialog *ui;
@@ -48,7 +51,6 @@ private:
     QMap<QString, QTcpSocket*> userSockets;
 
     void handleChatMessage(QTcpSocket* socket, const QJsonObject& json);
-    void handleAudioData(QTcpSocket* socket, const QByteArray& data);
     void handleImageData(QTcpSocket* socket, const QByteArray& data);
     void broadcastMessage(const QJsonObject& json, QTcpSocket* exclude = nullptr);
     void broadcastToAll(const QByteArray& data, const QString& type = "", QTcpSocket* exclude = nullptr);

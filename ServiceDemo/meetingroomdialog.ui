@@ -78,7 +78,7 @@
   <widget class="QLineEdit" name="messageLineEdit">
    <property name="geometry">
     <rect>
-     <x>180</x>
+     <x>70</x>
      <y>290</y>
      <width>521</width>
      <height>61</height>
@@ -98,14 +98,14 @@
   <widget class="QPushButton" name="sendButton">
    <property name="geometry">
     <rect>
-     <x>110</x>
-     <y>240</y>
-     <width>113</width>
+     <x>630</x>
+     <y>290</y>
+     <width>101</width>
      <height>30</height>
     </rect>
    </property>
    <property name="text">
-    <string>发送</string>
+    <string>发送文字</string>
    </property>
   </widget>
   <widget class="QPushButton" name="broadcastButton">
@@ -132,6 +132,19 @@
    </property>
    <property name="text">
     <string>踢出</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="sendImageButton">
+   <property name="geometry">
+    <rect>
+     <x>630</x>
+     <y>330</y>
+     <width>106</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>选择图片</string>
    </property>
   </widget>
  </widget>
