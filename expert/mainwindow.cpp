@@ -15,12 +15,10 @@
 #include "workordermanager.h"
 #include "telemetryclient.h"
 #include "chatclient.h"
-
-// 可选：历史工单/知识库（若已添加这些文件则启用）
+#include "meetingdialog.h"
+// 仅保留历史工单
 #include "ticketsclient.h"
-#include "knowledgeclient.h"
 #include "ticketsviewdialog.h"
-#include "knowledgeviewdialog.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
@@ -97,16 +95,16 @@ void MainWindow::bindServices(TcpClient* tcp,
         });
     }
 
-    // 菜单：历史工单/知识库（可选）
-    // 若你尚未添加对应类文件，可注释此段包含与代码
+    // 菜单：仅保留“历史工单”
     tickets_ = new TicketsClient(tcp_, this);
-    kb_      = new KnowledgeClient(tcp_, this);
     auto* viewMenu = menuBar()->addMenu(tr("查看"));
     auto* actTickets = viewMenu->addAction(tr("历史工单"));
-    auto* actKB      = viewMenu->addAction(tr("企业知识库"));
     connect(actTickets, &QAction::triggered, this, &MainWindow::showTickets);
-    connect(actKB,      &QAction::triggered, this, &MainWindow::showKnowledge);
-
+    //菜单会议功能
+    auto* viewMenu1 = menuBar()->addMenu(tr("在线会议"));
+    auto* createMeeting = viewMenu1->addAction(tr("创建会议"));
+    auto* joinMeet = viewMenu1->addAction(tr("加入会议"));
+    connect(joinMeet, &QAction::triggered, this, &MainWindow::joinMeeting);
     // 启动即显示登录对话框
     showLogin();
     if (loginDlg_) {
@@ -164,7 +162,7 @@ void MainWindow::onLoginFailed(const QString& reason) {
     }
 }
 
-// 历史工单/知识库菜单动作（可选）
+// 历史工单菜单动作
 void MainWindow::showTickets() {
     if (!dlgTickets_) {
         dlgTickets_ = new TicketsViewDialog(this);
@@ -176,13 +174,9 @@ void MainWindow::showTickets() {
     dlgTickets_->refresh();
 }
 
-void MainWindow::showKnowledge() {
-    if (!dlgKB_) {
-        dlgKB_ = new KnowledgeViewDialog(this);
-        dlgKB_->bindServices(kb_);
-    }
-    dlgKB_->show();
-    dlgKB_->raise();
-    dlgKB_->activateWindow();
-    dlgKB_->refresh();
+void MainWindow::joinMeeting(){
+    MeetingDialog *dlg = new MeetingDialog("expert_user", "localhost", 12347, "", this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setModal(false);
+    dlg->show();
 }
