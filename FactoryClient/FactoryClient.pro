@@ -7,8 +7,12 @@ CONFIG += c++17
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+QT += multimedia multimediawidgets
+
+DEFINES += QT_MULTIMEDIA_LIB
 
 SOURCES += \
+    fakevideothread.cpp \
     meetingdialog.cpp \
     workorderdialog.cpp \
     main.cpp \
@@ -19,10 +23,10 @@ SOURCES += \
     devicemonitorpanel.cpp \
     accountinfodialog.cpp \
     chatdialog.cpp \
-    audioprocessor.cpp \
-    videoprocessor.cpp \
+    audioprocessor.cpp
 
 HEADERS += \
+    fakevideothread.h \
     meetingdialog.h \
     workorderdialog.h \
     mainwindow.h \
@@ -32,8 +36,7 @@ HEADERS += \
     devicemonitorpanel.h \
     accountinfodialog.h \
     chatdialog.h \
-    audioprocessor.h \
-    videoprocessor.h \
+    audioprocessor.h
 
 FORMS += \
     mainwindow.ui \
