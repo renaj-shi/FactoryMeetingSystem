@@ -1,4 +1,4 @@
-QT       += core gui sql network charts serialport widgets multimedia multimediawidgets
+QT       += core gui sql network charts serialport widgets multimediawidgets
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -8,6 +8,10 @@ CONFIG += c++17
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+QT += multimedia multimediawidgets
+
+DEFINES += QT_MULTIMEDIA_LIB
+
 SOURCES += \
     devicedialog.cpp \
     deviceworker.cpp \
@@ -15,10 +19,8 @@ SOURCES += \
     mainwindow.cpp \
     meetingroomdialog.cpp \
     ticketsdialog.cpp \
-    audioprocessor.cpp \
-    videoprocessor.cpp
-
-
+    videothread.cpp \
+    audioprocessor.cpp
 
 HEADERS += \
     devicedialog.h \
@@ -26,8 +28,8 @@ HEADERS += \
     mainwindow.h \
     meetingroomdialog.h \
     ticketsdialog.h \
-    audioprocessor.h \
-    videoprocessor.h
+    videothread.h \
+    audioprocessor.h
 
 FORMS += \
     devicedialog.ui \

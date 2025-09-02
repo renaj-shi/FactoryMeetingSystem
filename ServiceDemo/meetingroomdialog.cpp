@@ -1,6 +1,5 @@
 #include "meetingroomdialog.h"
 #include "ui_meetingroomdialog.h"
-#include "audioprocessor.h"
 #include <QMessageBox>
 #include <QDateTime>
 #include <QScrollBar>
@@ -9,15 +8,21 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
+#include <QDataStream>
 #include <QFileDialog>  
 #include <QBuffer>       
 #include <QImage>        
 #include <QPixmap>
+#include <QElapsedTimer>
 
 MeetingRoomDialog::MeetingRoomDialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::MeetingRoomDialog),
     meetingServer(new QTcpServer(this))
+    , camera(nullptr)
+    , viewfinder(nullptr)
+    , imageCapture(nullptr)
+    , videoThread(nullptr)
 {
     ui->setupUi(this);
     setWindowTitle("远程专家会议室");
@@ -35,11 +40,20 @@ MeetingRoomDialog::MeetingRoomDialog(QWidget *parent) :
     ui->sendButton->setEnabled(true);
     ui->broadcastButton->setEnabled(true);
     ui->kickButton->setEnabled(true);
+    // 连接视频按钮信号槽
+    connect(ui->startVideoButton, &QPushButton::clicked, this, &MeetingRoomDialog::on_startVideoButton_clicked);
+    connect(ui->stopVideoButton, &QPushButton::clicked, this, &MeetingRoomDialog::on_stopVideoButton_clicked);
+
+
+
+    //!!!!!!!!!!!!!!!!!!!!!!!
+    updateUIStatus();
 }
 
 MeetingRoomDialog::~MeetingRoomDialog()
 {
     stopMeetingServer();
+    releaseCameraResources();
     delete ui;
 }
 
@@ -115,7 +129,6 @@ void MeetingRoomDialog::stopMeetingServer()
     ui->startMeetingButton->setEnabled(true);
     ui->closeMeetingButton->setEnabled(false);
     ui->clientListWidget->clear();
-
     addSystemMessage("会议室已关闭");
 }
 
@@ -228,7 +241,7 @@ void MeetingRoomDialog::handleChatMessage(QTcpSocket* socket, const QJsonObject&
         broadcastMessage(json, nullptr);
         addChatMessage(user, message, timestamp);
     }
-        else if (type == "image_message") {
+    else if (type == "image_message") {
         // 图片消息
         QString timestamp = json["timestamp"].toString();
         QString user = json["user"].toString();
@@ -247,6 +260,9 @@ void MeetingRoomDialog::handleChatMessage(QTcpSocket* socket, const QJsonObject&
     else if (type == "leave_meeting") {
         // 用户离开会议室
         socket->disconnectFromHost();
+    }
+    else if (type == "video_frame") {
+        handleVideoFrame(json);
     }
 }
 
@@ -376,7 +392,189 @@ void MeetingRoomDialog::on_startMeetingButton_clicked()
     } else {
         qDebug() << "会议服务器启动失败";
     }
+    updateUIStatus();
 }
+void MeetingRoomDialog::releaseCameraResources()
+{
+#ifdef QT_MULTIMEDIA_LIB
+    // 先停止视频线程
+    if (videoThread) {
+        videoThread->stop();
+        videoThread->wait(1000);
+        delete videoThread;
+        videoThread = nullptr;
+    }
+
+    if (camera) {
+        if (camera->state() == QCamera::ActiveState) {
+            camera->stop();
+        }
+        delete camera;
+        camera = nullptr;
+    }
+
+    if (viewfinder) {
+        viewfinder->deleteLater();
+        viewfinder = nullptr;
+    }
+
+    if (imageCapture) {
+        delete imageCapture;
+        imageCapture = nullptr;
+    }
+
+    ui->localVideoLabel->clear();
+    ui->remoteVideoLabel->clear();
+#endif
+}
+
+void MeetingRoomDialog::updateUIStatus()
+{
+#ifdef QT_MULTIMEDIA_LIB
+    const bool camActive = (camera && camera->state() == QCamera::ActiveState);
+#else
+    const bool camActive = false;
+#endif
+
+    // 视频按钮状态
+    // 在你的代码附近添加：
+    // 获取按钮当前状态
+    bool isCurrentlyEnabled = ui->startVideoButton->isEnabled();
+
+    if (isCurrentlyEnabled) {
+        // 如果当前可以点击，则设置为不能点击
+        ui->startVideoButton->setEnabled(false);
+    } else {
+        // 如果当前不能点击，且服务器正在监听，则设置为可以点击
+        if (meetingServer->isListening()) {
+            ui->startVideoButton->setEnabled(true);
+        }
+        // 如果服务器没在监听，保持不能点击状态（什么都不做）
+    }
+    ui->stopVideoButton->setEnabled(camActive);
+}
+
+void MeetingRoomDialog::on_startVideoButton_clicked()
+{
+#ifdef QT_MULTIMEDIA_LIB
+    releaseCameraResources();
+
+    QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
+    if (cameras.isEmpty()) {
+        QMessageBox::warning(this, "警告", "没有找到可用的摄像头");
+        return;
+    }
+
+    try {
+        camera = new QCamera(cameras.first(), this);
+
+        viewfinder = new QCameraViewfinder();
+        viewfinder->setParent(ui->localVideoLabel);
+        viewfinder->resize(ui->localVideoLabel->size());
+        viewfinder->show();
+        camera->setViewfinder(viewfinder);
+
+        imageCapture = new QCameraImageCapture(camera, this);
+        imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToBuffer);
+
+        QCameraViewfinderSettings settings;
+        //settings.setResolution(640, 480);
+        //settings.setPixelFormat(QVideoFrame::Format_Jpeg);
+        camera->setViewfinderSettings(settings);
+
+        // 发送路径：捕获 → sendVideoFrame()
+        connect(imageCapture, &QCameraImageCapture::imageCaptured,
+                this, [this](int, const QImage &image) {
+                    this->sendVideoFrame(image);
+                });
+
+        camera->start();
+
+        QElapsedTimer waitTimer;
+        waitTimer.start();
+        while (waitTimer.elapsed() < 3000) {
+            if (camera->state() == QCamera::ActiveState) break;
+            QCoreApplication::processEvents();
+            QThread::msleep(10);
+        }
+        if (camera->state() != QCamera::ActiveState) {
+            throw std::runtime_error("无法启动摄像头");
+        }
+
+        // 本地预览线程
+        videoThread = new VideoThread(imageCapture, this);
+        connect(videoThread, &VideoThread::frameCaptured, this, &MeetingRoomDialog::videoFrameReceived);
+        videoThread->start();
+
+        updateUIStatus();
+        addSystemMessage("视频聊天已启动");
+
+    } catch (const std::exception& e) {
+        releaseCameraResources();
+        QMessageBox::warning(this, "摄像头错误", QString("无法访问摄像头: %1").arg(e.what()));
+    }
+#else
+    addSystemMessage("视频功能不可用");
+#endif
+}
+
+void MeetingRoomDialog::on_stopVideoButton_clicked()
+{
+#ifdef QT_MULTIMEDIA_LIB
+    releaseCameraResources();
+    updateUIStatus();
+    addSystemMessage("视频聊天已停止");
+#else
+    addSystemMessage("视频功能不可用");
+#endif
+}
+
+void MeetingRoomDialog::videoFrameReceived(QImage image)
+{
+#ifdef QT_MULTIMEDIA_LIB
+    QPixmap pixmap = QPixmap::fromImage(image);
+    ui->localVideoLabel->setPixmap(pixmap.scaled(ui->localVideoLabel->size(),
+                                                 Qt::KeepAspectRatio,
+                                                 Qt::SmoothTransformation));
+#else
+    Q_UNUSED(image)
+#endif
+}
+
+#ifdef QT_MULTIMEDIA_LIB
+void MeetingRoomDialog::sendVideoFrame(const QImage &image)
+{
+    if (meetingClients.isEmpty()) return;
+
+    QByteArray imgData;
+    QBuffer buffer(&imgData);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "JPEG", 50);
+
+    // 使用JSON格式发送视频帧
+    QJsonObject videoMsg;
+    videoMsg["type"] = "video_frame";
+    videoMsg["data"] = QString(imgData.toBase64());
+    videoMsg["timestamp"] = QDateTime::currentDateTime().toString("hh:mm:ss");
+
+    broadcastMessage(videoMsg);
+}
+
+void MeetingRoomDialog::handleVideoFrame(const QJsonObject &json)
+{
+    QString base64Data = json["data"].toString();
+    QByteArray imgData = QByteArray::fromBase64(base64Data.toUtf8());
+    QImage image;
+    if (image.loadFromData(imgData, "JPEG")) {
+        QPixmap pixmap = QPixmap::fromImage(image);
+        ui->remoteVideoLabel->setPixmap(pixmap.scaled(
+            ui->remoteVideoLabel->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation));
+    }
+}
+
+#endif
 
 void MeetingRoomDialog::on_sendImageButton_clicked()
 {
