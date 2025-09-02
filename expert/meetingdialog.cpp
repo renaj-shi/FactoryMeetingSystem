@@ -529,145 +529,9 @@ void MeetingDialog::onVideoFrameReceived(const QImage &frame)
                                               Qt::SmoothTransformation));
 }
 
-void MeetingDialog::setupUI()
+void MeetingDialog::setupVideoUI()
 {
-    // 使用水平布局作为主布局
-    QHBoxLayout *mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(12, 12, 12, 12);
-    mainLayout->setSpacing(12);
-
-    // 左侧：聊天区域
-    QWidget *chatWidget = new QWidget(this);
-    chatWidget->setMinimumWidth(350);
-    QVBoxLayout *chatLayout = new QVBoxLayout(chatWidget);
-    chatLayout->setContentsMargins(0, 0, 0, 0);
-    chatLayout->setSpacing(8);
-
-    // 聊天标题
-    QLabel *chatTitle = new QLabel("聊天室", chatWidget);
-    chatTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #1e293b; padding: 5px 0;");
-    chatLayout->addWidget(chatTitle);
-
-    // 聊天区域
-    chatTextEdit = new QTextEdit(chatWidget);
-    chatTextEdit->setReadOnly(true);
-    chatTextEdit->setStyleSheet(R"(
-        QTextEdit {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 8px;
-            font-size: 13px;
-        }
-    )");
-    chatLayout->addWidget(chatTextEdit, 1);
-
-    // 消息输入区域
-    QHBoxLayout *inputLayout = new QHBoxLayout();
-    inputLayout->setSpacing(8);
-
-    messageEdit = new QLineEdit(chatWidget);
-    messageEdit->setPlaceholderText("输入消息...");
-    messageEdit->setStyleSheet(R"(
-        QLineEdit {
-            padding: 10px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        QLineEdit:focus {
-            border-color: #3b82f6;
-        }
-    )");
-
-    sendButton = new QPushButton("发送", chatWidget);
-    sendButton->setFixedWidth(80);
-    sendButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #3b82f6;
-            color: white;
-            padding: 10px;
-            border-radius: 6px;
-            border: none;
-            font-weight: 500;
-        }
-        QPushButton:hover {
-            background-color: #2563eb;
-        }
-        QPushButton:pressed {
-            background-color: #1d4ed8;
-        }
-        QPushButton:disabled {
-            background-color: #cbd5e1;
-        }
-    )");
-
-    inputLayout->addWidget(messageEdit, 1);
-    inputLayout->addWidget(sendButton);
-    chatLayout->addLayout(inputLayout);
-
-    // 会议控制按钮
-    QHBoxLayout *controlLayout = new QHBoxLayout();
-    controlLayout->setSpacing(8);
-
-    joinMeetingButton = new QPushButton("加入会议", chatWidget);
-    joinMeetingButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #10b981;
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            border: none;
-            font-weight: 500;
-        }
-        QPushButton:hover {
-            background-color: #059669;
-        }
-        QPushButton:pressed {
-            background-color: #047857;
-        }
-    )");
-
-    leaveMeetingButton = new QPushButton("离开会议", chatWidget);
-    leaveMeetingButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #ef4444;
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            border: none;
-            font-weight: 500;
-        }
-        QPushButton:hover {
-            background-color: #dc2626;
-        }
-        QPushButton:pressed {
-            background-color: #b91c1c;
-        }
-        QPushButton:disabled {
-            background-color: #cbd5e1;
-        }
-    )");
-
-    controlLayout->addWidget(joinMeetingButton);
-    controlLayout->addWidget(leaveMeetingButton);
-    controlLayout->addStretch();
-    chatLayout->addLayout(controlLayout);
-
-    // 右侧：视频区域
-    setupVideoUI();
-
-    // 添加到主布局
-    mainLayout->addWidget(chatWidget, 2); // 聊天区域占2份
-    mainLayout->addWidget(videoContainerWidget, 1); // 视频区域占1份
-
-    // 连接按钮信号
-    connect(joinMeetingButton, &QPushButton::clicked, this, &MeetingDialog::onJoinMeetingClicked);
-    connect(leaveMeetingButton, &QPushButton::clicked, this, &MeetingDialog::onLeaveMeetingClicked);
-    connect(sendButton, &QPushButton::clicked, this, &MeetingDialog::onSendButtonClicked);
-    connect(messageEdit, &QLineEdit::returnPressed, this, &MeetingDialog::onSendButtonClicked);
-
-    // 创建视频容器widget
+// 创建视频容器widget
     videoContainerWidget = new QWidget(this);
     videoContainerWidget->setMinimumWidth(320);
     QVBoxLayout *videoLayout = new QVBoxLayout(videoContainerWidget);
@@ -791,13 +655,8 @@ void MeetingDialog::setupUI()
     connect(startVideoButton, &QPushButton::clicked, this, &MeetingDialog::startVideo);
     connect(stopVideoButton,  &QPushButton::clicked, this, &MeetingDialog::stopVideo);
 
-}
-
-/*
-void MeetingDialog::setupVideoUI()
-{
     }
-*/
+
 void MeetingDialog::onSendImageClicked()
 {
     if (!isInMeeting) {
