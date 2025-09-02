@@ -4,6 +4,8 @@
 #include <QDialog>
 #include <QTcpSocket>
 #include <QString>
+#include <QLabel>
+#include "fakevideothread.h"
 #include "audioprocessor.h"
 
 class QTextEdit;
@@ -38,6 +40,7 @@ private slots:
     void onAudioButtonClicked();
     void onAudioDataReady(const QByteArray &audioData);
 
+
 private:
     void setupUI();
     void sendChatMessage(const QString &message);
@@ -45,8 +48,12 @@ private:
     void sendLeaveMeeting();
     void handleServerMessage(const QJsonObject &json);
     void addMessageToChat(const QString &sender, const QString &message);
-    
-
+    void setupVideoUI();           // 新增
+    void startVideo();             // 新增
+    void stopVideo();
+    void sendVideoFrame(const QImage &frame);
+    void onVideoFrameReceived(const QImage &frame);
+    void processVideoFrame(const QJsonObject &json);
     QString username;
     bool isInMeeting;
     QTcpSocket *tcpSocket;
@@ -60,6 +67,12 @@ private:
     QPushButton *sendButton;
     QPushButton *joinMeetingButton;
     QPushButton *leaveMeetingButton;
+    QLabel *localVideoLabel  = nullptr;
+    QLabel *remoteVideoLabel = nullptr;
+    QPushButton *startVideoButton = nullptr;
+    QPushButton *stopVideoButton  = nullptr;
+    FakeVideoThread *fakeVideoThread = nullptr;
+    QWidget *videoContainerWidget;
     QPushButton *sendImageButton;
 };
 

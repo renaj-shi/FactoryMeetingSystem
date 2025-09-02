@@ -1,5 +1,9 @@
 #include "meetingdialog.h"
+#include "fakevideothread.h"
 #include "audioprocessor.h"
+#include <QBuffer>
+#include <QImage>
+#include <QPixmap>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDateTime>
@@ -13,6 +17,8 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QDebug>
+#include <QFile>
+#include <QFileInfo>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTextEdit>
@@ -32,8 +38,6 @@
 #include <QByteArray>
 #include <QPixmap>
 #include <QImage>
-
-
 MeetingDialog::MeetingDialog(const QString &username,
                              const QString &server,
                              int port,  // 改为 int
@@ -243,7 +247,7 @@ void MeetingDialog::sendJoinMeeting()
     QJsonObject joinMsg;
     joinMsg["type"] = "join_meeting";
     joinMsg["user"] = username;
-    joinMsg["user_type"] = "factory"; 
+    joinMsg["user_type"] = "factory";
 
     QJsonDocument doc(joinMsg);
     if (tcpSocket->state() == QAbstractSocket::ConnectedState) {
@@ -296,7 +300,12 @@ void MeetingDialog::onSocketReadyRead()
             QJsonParseError error;
             QJsonDocument doc = QJsonDocument::fromJson(data.mid(5), &error);
             if (error.error == QJsonParseError::NoError && !doc.isNull()) {
-                handleServerMessage(doc.object());
+                QJsonObject json = doc.object();
+                QString type = json["type"].toString();
+                if (type == "video_frame")
+                    processVideoFrame(json);
+                else
+                    handleServerMessage(json);
             }
         }
         else if (data.startsWith("AUDIO:")) {
@@ -306,6 +315,18 @@ void MeetingDialog::onSocketReadyRead()
                 audioProcessor->playAudio(audioData);
             }
         }
+    }
+}
+
+void MeetingDialog::processVideoFrame(const QJsonObject &json)
+{
+    QString type = json["type"].toString();
+    if (type == "video_frame") {
+        QString base64Data = json["data"].toString();
+        QByteArray imgData = QByteArray::fromBase64(base64Data.toUtf8());
+        QImage image;
+        if (image.loadFromData(imgData, "JPEG"))
+            onVideoFrameReceived(image);
     }
 }
 
@@ -369,6 +390,7 @@ void MeetingDialog::handleServerMessage(const QJsonObject &json)
         addMessageToChat("系统错误", errorMsg);
         leaveMeetingButton->setEnabled(true);
     }
+    
 }
 
 void MeetingDialog::onSocketDisconnected()
@@ -402,6 +424,380 @@ void MeetingDialog::addMessageToChat(const QString &sender, const QString &messa
     scrollbar->setValue(scrollbar->maximum());
 }
 
+void MeetingDialog::startVideo()
+{
+    // 如果已启动，则忽略
+    if (fakeVideoThread)
+        return;
+
+    //指定本地视频文件地址
+    QString localVideoPath = ":/videos/my_video.mp4";
+
+    // 生成一张纯色测试图（640×480 绿色）
+    QFile videoFile(localVideoPath);
+    if (videoFile.exists()) {
+        // 使用本地视频文件作为伪装源
+        fakeVideoThread = new FakeVideoThread(this);
+        fakeVideoThread->setVideoFile(localVideoPath);
+
+        connect(fakeVideoThread, &FakeVideoThread::frameReady,
+                this, [this](const QImage &img){
+                    // 本地预览
+                    localVideoLabel->setPixmap(
+                        QPixmap::fromImage(img).scaled(
+                            localVideoLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                    // 发送给服务器
+                    sendVideoFrame(img);
+                });
+        fakeVideoThread->start();
+
+        addMessageToChat("系统", QString("正在播放本地视频: %1").arg(QFileInfo(localVideoPath).fileName()));
+    } else {
+        // 如果视频文件不存在，使用默认的纯色测试图
+        addMessageToChat("系统", "视频文件不存在，使用默认虚拟视频");
+
+        QImage fakeFrame(640, 480, QImage::Format_RGB32);
+        fakeFrame.fill(Qt::green);
+
+        fakeVideoThread = new FakeVideoThread(fakeFrame, this);
+        connect(fakeVideoThread, &FakeVideoThread::frameReady,
+                this, [this](const QImage &img){
+                    localVideoLabel->setPixmap(
+                        QPixmap::fromImage(img).scaled(
+                            localVideoLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                    sendVideoFrame(img);
+                });
+        fakeVideoThread->start();
+    }
+
+    startVideoButton->setEnabled(false);
+    stopVideoButton->setEnabled(true);
+    addMessageToChat("系统", "虚拟视频已启动");
+}
+
+void MeetingDialog::stopVideo()
+{
+    if (fakeVideoThread) {
+        fakeVideoThread->stop();
+        fakeVideoThread->deleteLater();
+        fakeVideoThread = nullptr;
+    }
+
+    localVideoLabel->clear();
+    localVideoLabel->setText("本地视频");
+    remoteVideoLabel->clear();
+    remoteVideoLabel->setText("远程视频");
+
+    startVideoButton->setEnabled(isInMeeting);
+    stopVideoButton->setEnabled(false);
+    addMessageToChat("系统", "虚拟视频已停止");
+}
+
+void MeetingDialog::sendVideoFrame(const QImage &frame)
+{
+#ifdef QT_MULTIMEDIA_LIB
+    if (!isInMeeting || !tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        return;
+    }
+
+    // 发送视频帧到服务器
+    QByteArray imgData;
+    QBuffer buffer(&imgData);
+    buffer.open(QIODevice::WriteOnly);
+    frame.save(&buffer, "JPEG", 50);
+
+    // 调整图像大小以提高传输效率
+    QImage scaledImage = frame.scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    scaledImage.save(&buffer, "JPEG", 50);  // 50% 质量
+
+    QJsonObject videoMsg;
+    videoMsg["type"] = "video_frame";
+    videoMsg["data"] = QString(imgData.toBase64());
+    videoMsg["timestamp"] = QDateTime::currentDateTime().toString("hh:mm:ss");
+
+    QJsonDocument doc(videoMsg);
+    QByteArray data = "JSON:" + doc.toJson(QJsonDocument::Compact) + "\n";
+    tcpSocket->write(data);
+#endif
+}
+
+void MeetingDialog::onVideoFrameReceived(const QImage &frame)
+{
+    QPixmap pixmap = QPixmap::fromImage(frame);
+    remoteVideoLabel->setPixmap(pixmap.scaled(remoteVideoLabel->size(),
+                                              Qt::KeepAspectRatio,
+                                              Qt::SmoothTransformation));
+}
+
+void MeetingDialog::setupUI()
+{
+    // 使用水平布局作为主布局
+    QHBoxLayout *mainLayout = new QHBoxLayout(this);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(12);
+
+    // 左侧：聊天区域
+    QWidget *chatWidget = new QWidget(this);
+    chatWidget->setMinimumWidth(350);
+    QVBoxLayout *chatLayout = new QVBoxLayout(chatWidget);
+    chatLayout->setContentsMargins(0, 0, 0, 0);
+    chatLayout->setSpacing(8);
+
+    // 聊天标题
+    QLabel *chatTitle = new QLabel("聊天室", chatWidget);
+    chatTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #1e293b; padding: 5px 0;");
+    chatLayout->addWidget(chatTitle);
+
+    // 聊天区域
+    chatTextEdit = new QTextEdit(chatWidget);
+    chatTextEdit->setReadOnly(true);
+    chatTextEdit->setStyleSheet(R"(
+        QTextEdit {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+        }
+    )");
+    chatLayout->addWidget(chatTextEdit, 1);
+
+    // 消息输入区域
+    QHBoxLayout *inputLayout = new QHBoxLayout();
+    inputLayout->setSpacing(8);
+
+    messageEdit = new QLineEdit(chatWidget);
+    messageEdit->setPlaceholderText("输入消息...");
+    messageEdit->setStyleSheet(R"(
+        QLineEdit {
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        QLineEdit:focus {
+            border-color: #3b82f6;
+        }
+    )");
+
+    sendButton = new QPushButton("发送", chatWidget);
+    sendButton->setFixedWidth(80);
+    sendButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #2563eb;
+        }
+        QPushButton:pressed {
+            background-color: #1d4ed8;
+        }
+        QPushButton:disabled {
+            background-color: #cbd5e1;
+        }
+    )");
+
+    inputLayout->addWidget(messageEdit, 1);
+    inputLayout->addWidget(sendButton);
+    chatLayout->addLayout(inputLayout);
+
+    // 会议控制按钮
+    QHBoxLayout *controlLayout = new QHBoxLayout();
+    controlLayout->setSpacing(8);
+
+    joinMeetingButton = new QPushButton("加入会议", chatWidget);
+    joinMeetingButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #10b981;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #059669;
+        }
+        QPushButton:pressed {
+            background-color: #047857;
+        }
+    )");
+
+    leaveMeetingButton = new QPushButton("离开会议", chatWidget);
+    leaveMeetingButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #ef4444;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #dc2626;
+        }
+        QPushButton:pressed {
+            background-color: #b91c1c;
+        }
+        QPushButton:disabled {
+            background-color: #cbd5e1;
+        }
+    )");
+
+    controlLayout->addWidget(joinMeetingButton);
+    controlLayout->addWidget(leaveMeetingButton);
+    controlLayout->addStretch();
+    chatLayout->addLayout(controlLayout);
+
+    // 右侧：视频区域
+    setupVideoUI();
+
+    // 添加到主布局
+    mainLayout->addWidget(chatWidget, 2); // 聊天区域占2份
+    mainLayout->addWidget(videoContainerWidget, 1); // 视频区域占1份
+
+    // 连接按钮信号
+    connect(joinMeetingButton, &QPushButton::clicked, this, &MeetingDialog::onJoinMeetingClicked);
+    connect(leaveMeetingButton, &QPushButton::clicked, this, &MeetingDialog::onLeaveMeetingClicked);
+    connect(sendButton, &QPushButton::clicked, this, &MeetingDialog::onSendButtonClicked);
+    connect(messageEdit, &QLineEdit::returnPressed, this, &MeetingDialog::onSendButtonClicked);
+
+    // 创建视频容器widget
+    videoContainerWidget = new QWidget(this);
+    videoContainerWidget->setMinimumWidth(320);
+    QVBoxLayout *videoLayout = new QVBoxLayout(videoContainerWidget);
+    videoLayout->setContentsMargins(0, 0, 0, 0);
+    videoLayout->setSpacing(12);
+
+    // 视频标题
+    QLabel *videoTitle = new QLabel("视频通话", videoContainerWidget);
+    videoTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #1e293b; padding: 5px 0;");
+    videoTitle->setAlignment(Qt::AlignCenter);
+    videoLayout->addWidget(videoTitle);
+
+    // 视频显示区域
+    QFrame *videoFrame = new QFrame(videoContainerWidget);
+    videoFrame->setStyleSheet(R"(
+        QFrame {
+            background-color: #000;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+    )");
+    QVBoxLayout *frameLayout = new QVBoxLayout(videoFrame);
+    frameLayout->setContentsMargins(12, 12, 12, 12);
+    frameLayout->setSpacing(12);
+
+    // 本地视频
+    QLabel *localTitle = new QLabel("本地视频", videoFrame);
+    localTitle->setStyleSheet("color: #ffffff; font-size: 12px;");
+    localTitle->setAlignment(Qt::AlignCenter);
+    frameLayout->addWidget(localTitle);
+
+    localVideoLabel = new QLabel(videoFrame);
+    localVideoLabel->setAlignment(Qt::AlignCenter);
+    localVideoLabel->setStyleSheet(R"(
+        QLabel {
+            background-color: #2d3748;
+            border: 2px solid #4a5568;
+            border-radius: 6px;
+            color: #a0aec0;
+            min-height: 120px;
+        }
+    )");
+    localVideoLabel->setMinimumSize(280, 160);
+    frameLayout->addWidget(localVideoLabel);
+
+    // 远程视频
+    QLabel *remoteTitle = new QLabel("远程视频", videoFrame);
+    remoteTitle->setStyleSheet("color: #ffffff; font-size: 12px;");
+    remoteTitle->setAlignment(Qt::AlignCenter);
+    frameLayout->addWidget(remoteTitle);
+
+    remoteVideoLabel = new QLabel(videoFrame);
+    remoteVideoLabel->setAlignment(Qt::AlignCenter);
+    remoteVideoLabel->setStyleSheet(R"(
+        QLabel {
+            background-color: #2d3748;
+            border: 2px solid #4a5568;
+            border-radius: 6px;
+            color: #a0aec0;
+            min-height: 120px;
+        }
+    )");
+    remoteVideoLabel->setMinimumSize(280, 160);
+    frameLayout->addWidget(remoteVideoLabel);
+
+    videoLayout->addWidget(videoFrame, 1);
+
+    // 视频控制按钮
+    QHBoxLayout *videoButtonLayout = new QHBoxLayout();
+    videoButtonLayout->setSpacing(8);
+
+    startVideoButton = new QPushButton("开始视频", videoContainerWidget);
+    startVideoButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #2563eb;
+        }
+        QPushButton:pressed {
+            background-color: #1d4ed8;
+        }
+        QPushButton:disabled {
+            background-color: #cbd5e1;
+        }
+    )");
+
+    stopVideoButton = new QPushButton("停止视频", videoContainerWidget);
+    stopVideoButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #6b7280;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #4b5563;
+        }
+        QPushButton:pressed {
+            background-color: #374151;
+        }
+        QPushButton:disabled {
+            background-color: #cbd5e1;
+        }
+    )");
+    stopVideoButton->setEnabled(false);
+
+    videoButtonLayout->addWidget(startVideoButton);
+    videoButtonLayout->addWidget(stopVideoButton);
+    videoButtonLayout->addStretch();
+    videoLayout->addLayout(videoButtonLayout);
+
+    // 连接视频按钮信号
+    connect(startVideoButton, &QPushButton::clicked, this, &MeetingDialog::startVideo);
+    connect(stopVideoButton,  &QPushButton::clicked, this, &MeetingDialog::stopVideo);
+
+}
+
+/*
+void MeetingDialog::setupVideoUI()
+{
+    }
+*/
 void MeetingDialog::onSendImageClicked()
 {
     if (!isInMeeting) {
@@ -486,6 +882,3 @@ void MeetingDialog::onAudioDataReady(const QByteArray &audioData)
         tcpSocket->write(data);
     }
 }
-
-
-

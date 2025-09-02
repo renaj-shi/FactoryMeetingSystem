@@ -6,6 +6,7 @@ CONFIG += c++17
 
 SOURCES += \
     chatclient.cpp \
+    fakevideothread.cpp \
     main.cpp \
     meetingdialog.cpp \
     tcpclient.cpp \
@@ -17,11 +18,11 @@ SOURCES += \
     logindialog.cpp \
     sessionwidget.cpp \
     mainwindow.cpp \
-    audioprocessor.cpp \
-    videoprocessor.cpp
+    audioprocessor.cpp
 
 HEADERS += \
     chatclient.h \
+    fakevideothread.h \
     meetingdialog.h \
     tcpclient.h \
     authmanager.h \
@@ -32,8 +33,7 @@ HEADERS += \
     logindialog.h \
     sessionwidget.h \
     mainwindow.h \
-    audioprocessor.h \
-    videoprocessor.h
+    audioprocessor.h
 
 FORMS += \
     mainwindow.ui \
