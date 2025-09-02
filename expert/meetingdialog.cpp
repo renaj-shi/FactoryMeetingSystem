@@ -160,6 +160,14 @@ void MeetingDialog::setupUI()
     controlLayout->addStretch();
     mainLayout->addLayout(controlLayout);
 
+    // 右侧：视频区域
+        setupVideoUI();
+
+        // 添加到主布局
+        mainLayout->addWidget(this, 2); // 聊天区域占2份
+        mainLayout->addWidget(videoContainerWidget, 1); // 视频区域占1份
+
+
      // 添加音频控制按钮
     audioButton = new QPushButton("开启语音", this);
     audioButton->setStyleSheet(
