@@ -24,15 +24,23 @@ void DeviceWorker::stop()
 
 static bool openThreadDB()
 {
-    // 每个线程用独立的连接名
     QString connName = QString("worker_%1").arg(quintptr(QThread::currentThreadId()));
-    if (!QSqlDatabase::contains(connName)) {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-        db.setDatabaseName("industrial.db");
-        if (!db.open()) {
-            qDebug() << "worker thread open db fail:" << db.lastError().text();
-            return false;
+
+    // 检查连接是否存在且有效
+    if (QSqlDatabase::contains(connName)) {
+        QSqlDatabase db = QSqlDatabase::database(connName);
+        if (db.isOpen()) {
+            return true; // 连接已存在且打开
         }
+    }
+
+    // 创建新连接
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
+    db.setDatabaseName("industrial.db");
+    if (!db.open()) {
+        qDebug() << "worker thread open db fail:" << db.lastError().text();
+        QSqlDatabase::removeDatabase(connName); // 清理无效连接
+        return false;
     }
     return true;
 }

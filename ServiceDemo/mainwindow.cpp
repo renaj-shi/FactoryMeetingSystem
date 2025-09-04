@@ -8,26 +8,43 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QThread>
-
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QTextEdit>
+#include <QLabel>
+#include <QSplitter>
+//new
+#include <QGroupBox>
+#include <QPointer>
 #include "devicedialog.h"
 #include "ticketsdialog.h"
 #include "deviceworker.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+    : QMainWindow(parent, Qt::FramelessWindowHint)
     , ui(new Ui::MainWindow)
     , factoryServer(new QTcpServer(this))
     , expertServer(new QTcpServer(this))
 {
-    ui->setupUi(this);
+    ui->setupUi(this); // 必须先调用这个
+
+    // 设置UI和样式
+    setupUI();
+
     setWindowTitle("服务端");
 
+    // 创建空状态页面
+    createEmptyStatePage();
+
+    // 初始化数据库
     if (!initDatabase()) {
         ui->textEdit->append(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") +
                              " - 无法初始化数据库: " + db.lastError().text());
         return;
     }
 
+    // 启动服务器
     if (!factoryServer->listen(QHostAddress::Any, 12345)) {
         ui->textEdit->append(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") +
                              " - 无法启动工厂服务器接口: " + factoryServer->errorString());
@@ -49,15 +66,788 @@ MainWindow::MainWindow(QWidget *parent)
     connect(factoryServer, &QTcpServer::newConnection, this, &MainWindow::onFactoryNewConnection);
     connect(expertServer, &QTcpServer::newConnection, this, &MainWindow::onExpertNewConnection);
 
-    ui->statusbar->showMessage("Factory server: 12345, Expert server: 12346");
-    ui->textEdit->append(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") +
-                         " - 服务器启动完成，等待客户端连接...");
+    // 设置默认窗口大小
+    resize(1200, 800);
+
+    // 避免主界面关闭时触发全局退出
+    setAttribute(Qt::WA_QuitOnClose, false);
+
+    // 设置无边框窗口 - 需要额外处理窗口拖动
+    setWindowFlags(Qt::FramelessWindowHint);
 }
 
 MainWindow::~MainWindow()
 {
+    // 停止设备线程
+    if (m_deviceRunning.loadAcquire() == 1 && m_deviceWorker) {
+        QMetaObject::invokeMethod(m_deviceWorker, "stop", Qt::QueuedConnection);
+        if (m_deviceThread) {
+            m_deviceThread->quit();
+            m_deviceThread->wait(1000); // 等待1秒
+        }
+    }
     db.close();
     delete ui;
+}
+
+
+void MainWindow::createEmptyStatePage()
+{
+    openFeatureInTab("home","主页");
+}
+
+void MainWindow::setupUI()
+{
+    // 创建中央窗口部件
+    QWidget *centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
+
+    // 创建主布局
+    QHBoxLayout *mainLayout = new QHBoxLayout(centralWidget);
+    mainLayout->setSpacing(0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 创建左侧边栏
+    QWidget *sidebarWidget = new QWidget(this);
+    sidebarWidget->setMinimumWidth(200);
+    sidebarWidget->setMaximumWidth(200);
+    sidebarWidget->setStyleSheet("background-color: #1e293b;");
+    QVBoxLayout *sidebarLayout = new QVBoxLayout(sidebarWidget);
+    sidebarLayout->setSpacing(0);
+    sidebarLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 保存侧边栏布局指针
+    m_sidebarLayout = sidebarLayout;
+
+    // 添加左侧边栏到主布局
+    mainLayout->addWidget(sidebarWidget);
+
+    // 创建右侧主内容区
+    QWidget *mainContentWidget = new QWidget(this);
+    QVBoxLayout *mainContentLayout = new QVBoxLayout(mainContentWidget);
+    mainContentLayout->setSpacing(0);
+    mainContentLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 创建顶部栏
+    ui->tabBar = new QTabBar(this);
+    ui->tabBar->setStyleSheet(
+        "QTabBar::tab { padding: 10px 20px; background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1; }"
+        "QTabBar::tab:selected { background-color: #ffffff; border-bottom: 2px solid #3b82f6; }"
+        "QTabBar::close-button { image: url(:/icons/close.svg); subcontrol-position: right; }");
+    ui->tabBar->setExpanding(false);
+    ui->tabBar->setTabsClosable(true);
+    ui->tabBar->setMovable(true);
+
+    // 创建顶部栏右侧窗口控制按钮
+    QWidget *topBarRightWidget = new QWidget(this);
+    topBarRightWidget->setMaximumHeight(40);
+    QHBoxLayout *topBarRightLayout = new QHBoxLayout(topBarRightWidget);
+    topBarRightLayout->setContentsMargins(10, 5, 10, 5);
+
+    // 添加最小化按钮
+    QPushButton *minimizeButton = new QPushButton(this);
+    minimizeButton->setIcon(QIcon(":/icons/minimize.svg"));
+    minimizeButton->setIconSize(QSize(16, 16));
+    minimizeButton->setStyleSheet(
+        "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; width: 30px; height: 30px; }"
+        "QPushButton:hover { background-color: rgba(0, 0, 0, 0.1); }"
+        );
+    connect(minimizeButton, &QPushButton::clicked, this, [=]() {
+        this->showMinimized();
+    });
+
+    // 添加窗口化按钮
+    QPushButton *windowButton = new QPushButton(this);
+    windowButton->setIconSize(QSize(16, 16));
+    windowButton->setStyleSheet(
+        "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; width: 30px; height: 30px; }"
+        "QPushButton:hover { background-color: rgba(0, 0, 0, 0.1); }"
+        );
+
+    // 初始图标设置为windowed.svg
+    windowButton->setIcon(QIcon(":/icons/windowed.svg"));
+
+    this->showMaximized();
+
+    connect(windowButton, &QPushButton::clicked, this, [=]() {
+        if (this->isMaximized()) {
+            this->showNormal();
+            windowButton->setIcon(QIcon(":/icons/maximize.svg"));
+        } else {
+            this->showMaximized();
+            windowButton->setIcon(QIcon(":/icons/windowed.svg"));
+        }
+    });
+
+    // 添加关闭按钮
+    QPushButton *closeButton = new QPushButton(this);
+    closeButton->setIcon(QIcon(":/icons/close.svg"));
+    closeButton->setIconSize(QSize(16, 16));
+    closeButton->setStyleSheet(
+        "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; width: 30px; height: 30px; }"
+        "QPushButton:hover { background-color: rgba(239, 68, 68, 0.1); }"
+        );
+    connect(closeButton, &QPushButton::clicked, this, []() {
+        QApplication::quit();
+    });
+
+    topBarRightLayout->addStretch();
+    topBarRightLayout->addWidget(minimizeButton);
+    topBarRightLayout->addWidget(windowButton);
+    topBarRightLayout->addWidget(closeButton);
+
+    // 创建顶部栏容器
+    QWidget *topBarWidget = new QWidget(this);
+    topBarWidget->setMaximumHeight(40);
+    topBarWidget->setStyleSheet("background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1;");
+    QHBoxLayout *topBarLayout = new QHBoxLayout(topBarWidget);
+    topBarLayout->setContentsMargins(0, 0, 0, 0);
+    topBarLayout->setSpacing(0);
+
+    topBarLayout->addWidget(ui->tabBar);
+    topBarLayout->addWidget(topBarRightWidget, 1);
+
+    // 创建中央部件 - 使用分割布局
+    QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, this);
+    mainSplitter->setStyleSheet("QSplitter::handle { background-color: #e2e8f0; }");
+
+    // 左侧区域 (2/3) - 用于放置功能窗口
+    QWidget *leftWidget = new QWidget(mainSplitter);
+    QVBoxLayout *leftLayout = new QVBoxLayout(leftWidget);
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    leftLayout->setSpacing(0);
+
+    // 创建堆叠窗口用于显示功能页面
+    ui->stackedWidget = new QStackedWidget(leftWidget);
+    ui->stackedWidget->setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1;");
+    leftLayout->addWidget(ui->stackedWidget);
+
+    // 右侧区域 (1/3) - 用于显示服务器信息
+    QWidget *rightWidget = new QWidget(mainSplitter);
+    QVBoxLayout *rightLayout = new QVBoxLayout(rightWidget);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(0);
+
+    // 服务器信息标签
+    QLabel *serverInfoLabel = new QLabel("服务器信息", rightWidget);
+    serverInfoLabel->setStyleSheet("font-weight: bold; padding: 8px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;");
+    serverInfoLabel->setAlignment(Qt::AlignCenter);
+    rightLayout->addWidget(serverInfoLabel);
+
+    // 服务器信息文本框
+    ui->textEdit = new QTextEdit(rightWidget);
+    ui->textEdit->setStyleSheet("background-color: #f1f5f9; border: none; font-family: 'Courier New'; font-size: 10pt;");
+    ui->textEdit->setReadOnly(true);
+    rightLayout->addWidget(ui->textEdit);
+
+    // 设置分割比例 2:1
+    mainSplitter->addWidget(leftWidget);
+    mainSplitter->addWidget(rightWidget);
+    mainSplitter->setStretchFactor(0, 2);
+    mainSplitter->setStretchFactor(1, 1);
+
+    // 设置初始大小比例
+    QList<int> sizes;
+    sizes << width() * 2 / 3 << width() * 1 / 3;
+    mainSplitter->setSizes(sizes);
+
+    // 添加顶部栏和中央分割器到主内容布局
+    mainContentLayout->addWidget(topBarWidget);
+    mainContentLayout->addWidget(mainSplitter, 1);
+
+    // 添加主内容区到主布局
+    mainLayout->addWidget(mainContentWidget, 1);
+
+    // 创建侧边栏
+    createSidebar();
+
+    // 连接信号和槽
+    connect(ui->tabBar, &QTabBar::currentChanged, this, &MainWindow::on_tabBar_currentChanged);
+    connect(ui->tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::on_tabBar_tabCloseRequested);
+
+    // 初始化默认页面 - 必须先创建主页
+    openFeatureInTab("home", "主页");
+
+    // 设置当前页面为主页
+    if (m_featurePageMap.contains("home")) {
+        int homeIndex = m_featurePageMap.value("home");
+        ui->stackedWidget->setCurrentIndex(homeIndex);
+        ui->tabBar->setCurrentIndex(0);
+    }
+}
+
+void MainWindow::on_tabBar_currentChanged(int index)
+{
+    if (index < 0 || index >= m_tabFeatureNames.size()) return;
+
+    QString featureName = m_tabFeatureNames[index];
+    int pageIdx = m_featurePageMap.value(featureName, -1);
+
+    qDebug() << "切换到标签:" << featureName << "页面索引:" << pageIdx;
+
+    if (pageIdx >= 0 && pageIdx < ui->stackedWidget->count()) {
+        ui->stackedWidget->setCurrentIndex(pageIdx);
+    } else {
+        // 页面无效，重新创建
+        qDebug() << "页面无效，重新创建:" << featureName;
+        openFeatureInTab(featureName, getTabNameFromFeature(featureName));
+    }
+}
+
+// 关闭标签页
+void MainWindow::on_tabBar_tabCloseRequested(int index)
+{
+    if (index < 0 || index >= m_tabFeatureNames.size()) return;
+
+    QString feat = m_tabFeatureNames[index];
+
+    // 主页不允许关闭
+    if (feat == "home") {
+        qDebug() << "主页不允许关闭";
+        return;
+    }
+
+    qDebug() << "关闭标签页:" << feat;
+
+    // 移除数据
+    QString featureName = m_tabFeatureNames.takeAt(index);
+    int pageIdx = m_featurePageMap.take(featureName);
+
+    // 移除UI
+    ui->tabBar->removeTab(index);
+    QWidget* widget = ui->stackedWidget->widget(pageIdx);
+    if (widget) {
+        ui->stackedWidget->removeWidget(widget);
+        delete widget;
+    }
+
+    // 更新其他页面索引
+    for (auto it = m_featurePageMap.begin(); it != m_featurePageMap.end(); ++it) {
+        if (it.value() > pageIdx) {
+            it.value()--;
+        }
+    }
+
+    // 如果没有标签页，创建空状态
+    if (ui->tabBar->count() == 0) {
+        createEmptyStatePage();
+    }
+}
+
+// 打开或切换到功能标签页
+void MainWindow::openFeatureInTab(const QString& featureName, const QString& tabName)
+{
+    qDebug() << "打开功能标签页:" << featureName;
+
+    // 已存在 → 直接切换
+    if (m_featurePageMap.contains(featureName)) {
+        int tabIndex = m_tabFeatureNames.indexOf(featureName);
+        if (tabIndex != -1) {
+            ui->tabBar->setCurrentIndex(tabIndex);
+            return;
+        }
+    }
+
+    // 移除空状态页面（如果存在）
+    if (m_featurePageMap.contains("empty")) {
+        removeFeaturePage("empty");
+    }
+
+    // 创建对应的页面
+    QWidget* page = nullptr;
+    if (featureName == "home") {
+        page = createHomePage();  // 创建主页
+    } else if (featureName == "device_monitor") {
+        page = new DeviceDialog(this);
+    } else if (featureName == "tickets") {
+        page = new TicketsDialog(this);
+    } else if (featureName == "meeting") {
+        page = new MeetingRoomDialog(this);
+    } else {
+        qWarning() << "未知的功能名称:" << featureName;
+        return;
+    }
+
+    if (!page) return;
+
+    // 设置页面属性
+    page->setParent(ui->stackedWidget);
+
+    // 添加到堆叠窗口
+    int pageIndex = ui->stackedWidget->addWidget(page);
+    m_featurePageMap.insert(featureName, pageIndex);
+    m_tabFeatureNames.append(featureName);
+
+    // 添加标签页
+    int tabIndex = ui->tabBar->addTab(tabName);
+    ui->tabBar->setCurrentIndex(tabIndex);
+
+    qDebug() << "创建完成 - 功能:" << featureName << "页面索引:" << pageIndex << "标签索引:" << tabIndex;
+}
+
+// 创建主页
+QWidget* MainWindow::createHomePage()
+{
+    qDebug() << "创建主页";
+
+    QWidget *homePage = new QWidget();
+    homePage->setObjectName("homePage");
+
+    QGridLayout *gridLayout = new QGridLayout(homePage);
+    gridLayout->setSpacing(20);
+    gridLayout->setContentsMargins(40, 40, 40, 40);
+
+    // 创建四个功能按钮
+    QPushButton *buttons[] = {
+        createHomeButton("设备监控", ":/icons/device.svg"),
+        createHomeButton("启动设备", ":/icons/start.svg"),
+        createHomeButton("工单列表", ":/icons/ticket.svg"),
+        createHomeButton("会议管理", ":/icons/meeting.svg")
+    };
+
+    // 连接信号
+    connect(buttons[0], &QPushButton::clicked, this, &MainWindow::on_pushButton1_clicked);
+    connect(buttons[1], &QPushButton::clicked, this, &MainWindow::on_pushButton3_clicked);
+    connect(buttons[2], &QPushButton::clicked, this, &MainWindow::on_pushButton2_clicked);
+    connect(buttons[3], &QPushButton::clicked, this, &MainWindow::on_meetingButton_clicked);
+
+    // 添加到布局
+    for (int i = 0; i < 4; ++i) {
+        buttons[i]->setParent(homePage);
+        gridLayout->addWidget(buttons[i], i / 2, i % 2);
+    }
+
+    gridLayout->setRowStretch(2, 1);
+    gridLayout->setColumnStretch(2, 1);
+
+    return homePage;
+}
+
+// 辅助函数：根据功能名称获取标签名称
+QString MainWindow::getTabNameFromFeature(const QString& featureName)
+{
+    static QMap<QString, QString> featureToName = {
+        {"home", "主页"},
+        {"device_monitor", "设备监控"},
+        {"tickets", "工单列表"},
+        {"meeting", "会议管理"}
+    };
+
+    return featureToName.value(featureName, "未知");
+}
+
+// 辅助函数：移除功能页面
+void MainWindow::removeFeaturePage(const QString& featureName)
+{
+    if (m_featurePageMap.contains(featureName)) {
+        int pageIdx = m_featurePageMap.value(featureName);
+        int tabIdx = m_tabFeatureNames.indexOf(featureName);
+
+        // 移除UI
+        if (tabIdx != -1) {
+            ui->tabBar->removeTab(tabIdx);
+        }
+
+        QWidget* widget = ui->stackedWidget->widget(pageIdx);
+        if (widget) {
+            ui->stackedWidget->removeWidget(widget);
+            delete widget;
+        }
+
+        // 移除数据
+        m_featurePageMap.remove(featureName);
+        m_tabFeatureNames.removeAll(featureName);
+    }
+}
+
+// 修改各个按钮点击处理函数
+void MainWindow::on_pushButton1_clicked()
+{
+    openFeatureInTab("device_monitor", "设备监控");
+}
+
+void MainWindow::on_pushButton2_clicked()
+{
+    openFeatureInTab("tickets", "工单列表");
+}
+
+void MainWindow::on_meetingButton_clicked()
+{
+    openFeatureInTab("meeting", "会议管理");
+}
+
+void MainWindow::on_pushButton3_clicked()
+{
+    static bool running = false;
+    qDebug() << "=== 点击启动设备按钮 ===";
+    qDebug() << "当前运行状态:" << running;
+
+    if (!running) {
+        qDebug() << "开始启动设备监控...";
+
+        qDebug() << "创建DeviceWorker和QThread对象...";
+        m_deviceWorker = new DeviceWorker;
+        m_deviceThread = new QThread(this);
+
+        qDebug() << "将worker移动到线程...";
+        m_deviceWorker->moveToThread(m_deviceThread);
+
+        qDebug() << "连接信号和槽...";
+        // 修改连接方式：使用QueuedConnection确保线程安全
+        connect(m_deviceThread, &QThread::started, m_deviceWorker, &DeviceWorker::start);
+        connect(m_deviceWorker, &DeviceWorker::finished, m_deviceThread, &QThread::quit);
+        connect(m_deviceWorker, &DeviceWorker::finished, m_deviceWorker, &DeviceWorker::deleteLater);
+        connect(m_deviceThread, &QThread::finished, m_deviceThread, &QThread::deleteLater);
+
+
+
+        // 只连接数据信号，不包含数据库操作
+        connect(m_deviceWorker, &DeviceWorker::newData, this, [this](const DeviceParams &p){
+            qDebug() << "=== 收到新设备数据 ===";
+            qDebug() << "数据线程:" << QThread::currentThreadId();
+            qDebug() << "温度:" << p.temperature << "压力:" << p.pressure << "振动:" << p.vibration;
+            qDebug() << "状态:" << p.status << "时间:" << p.lastUpdate.toString();
+
+            broadcastDeviceParams(p);
+            qDebug() << "已广播设备参数";
+
+            if (!activeOrderId_.isEmpty()) {
+                qDebug() << "有活跃工单:" << activeOrderId_ << "，开始处理数据...";
+
+                // 实时推送（专家订阅）- 这是线程安全的
+                QJsonObject obj;
+                obj["ts"] = p.lastUpdate.toMSecsSinceEpoch();
+                obj["temperature"] = p.temperature;
+                obj["pressure"] = p.pressure;
+                obj["vibration"] = p.vibration;
+                obj["current"] = p.current;
+                obj["voltage"] = p.voltage;
+                obj["speed"] = p.speed;
+                obj["status"] = p.status ? 1 : 0;
+
+                QJsonArray logs;
+                logs.append(QString("T=%1,P=%2,V=%3")
+                                .arg(p.temperature,0,'f',1)
+                                .arg(p.pressure,0,'f',1)
+                                .arg(p.vibration,0,'f',2));
+                obj["logs"] = logs;
+
+                broadcastTelemetry(activeOrderId_, obj);
+                qDebug() << "已广播遥测数据";
+
+                // 将数据库操作移到DeviceWorker中执行
+                QMetaObject::invokeMethod(m_deviceWorker, "saveDeviceDataWithTicket",
+                                          Qt::QueuedConnection,
+                                          Q_ARG(DeviceParams, p),
+                                          Q_ARG(QString, activeOrderId_));
+
+                qDebug() << "已请求保存设备数据到数据库";
+            } else {
+                qDebug() << "无活跃工单，跳过数据库操作";
+
+                // 保存设备数据但不关联工单
+                QMetaObject::invokeMethod(m_deviceWorker, "saveDeviceData",
+                                          Qt::QueuedConnection,
+                                          Q_ARG(DeviceParams, p));
+            }
+
+            qDebug() << "=== 设备数据处理完成 ===";
+        }, Qt::QueuedConnection); // 确保使用队列连接
+
+        qDebug() << "启动设备线程...";
+        m_deviceThread->start();
+
+        // 正确的检查位置：在start()之后
+        qDebug() << "m_deviceThread is null?" << (m_deviceThread == nullptr);
+        qDebug() << "m_deviceWorker is null?" << (m_deviceWorker == nullptr);
+        qDebug() << "线程运行状态:" << m_deviceThread->isRunning();
+
+        //ui->pushButton3->setText("停止设备");
+        qDebug() << "按钮文本更新为: 停止设备";
+
+        // 更新主页按钮状态
+        updateHomeButtonState("启动设备", true);
+        qDebug() << "主页按钮状态更新";
+
+        running = true;
+        qDebug() << "运行状态设置为: true";
+
+        // 在服务器信息区域显示启动消息
+        QString startMsg = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") + " - 设备监控已启动";
+        ui->textEdit->append(startMsg);
+        qDebug() << "服务器信息更新:" << startMsg;
+
+        qDebug() << "=== 设备启动完成 ===";
+
+    } else {
+        qDebug() << "开始停止设备监控...";
+
+        if (m_deviceWorker) {
+            qDebug() << "调用DeviceWorker的stop方法...";
+            QMetaObject::invokeMethod(m_deviceWorker, "stop", Qt::QueuedConnection);
+        } else {
+            qDebug() << "m_deviceWorker为nullptr";
+        }
+
+        qDebug() << "按钮文本更新为: 启动设备";
+
+        // 更新主页按钮状态
+        updateHomeButtonState("启动设备", false);
+        qDebug() << "主页按钮状态更新";
+
+        running = false;
+        qDebug() << "运行状态设置为: false";
+
+        // 在服务器信息区域显示停止消息
+        QString stopMsg = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") + " - 设备监控已停止";
+        ui->textEdit->append(stopMsg);
+        qDebug() << "服务器信息更新:" << stopMsg;
+
+        qDebug() << "=== 设备停止完成 ===";
+    }
+
+    qDebug() << "=== 按钮点击处理完成 ===";
+}
+QPushButton* MainWindow::createHomeButton(const QString &text, const QString &iconPath)
+{
+    QPushButton *button = new QPushButton();
+
+    // 设置按钮文本和图标
+    button->setText(text);
+
+    // 设置图标（如果存在）
+    if (!iconPath.isEmpty() && QFile::exists(iconPath)) {
+        QIcon icon(iconPath);
+        if (!icon.isNull()) {
+            button->setIcon(icon);
+            button->setIconSize(QSize(50, 50)); // 适中大小的图标
+        } else {
+            qDebug() << "图标加载失败:" << iconPath;
+        }
+    }
+
+    // 设置按钮样式
+    button->setStyleSheet(R"(
+        QPushButton {
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #334155;
+            min-width: 140px;
+            min-height: 120px;
+            text-align: center;
+        }
+        QPushButton:hover {
+            background-color: #f8fafc;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        QPushButton:pressed {
+            background-color: #e2e8f0;
+            border-color: #2563eb;
+            color: #1e40af;
+        }
+        QPushButton:disabled {
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #94a3b8;
+        }
+    )");
+
+    // 设置按钮大小策略
+    button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+
+    return button;
+}
+
+// 更新主页按钮状态
+void MainWindow::updateHomeButtonState(const QString &buttonName, bool isRunning)
+{
+    // 查找主页
+    if (!m_featurePageMap.contains("home")) {
+        qDebug() << "主页不存在，无法更新按钮状态";
+        return;
+    }
+
+    int homeIndex = m_featurePageMap.value("home");
+    QWidget* homePage = ui->stackedWidget->widget(homeIndex);
+    if (!homePage) {
+        qDebug() << "主页部件无效，无法更新按钮状态";
+        return;
+    }
+
+    // 查找指定名称的按钮
+    QPushButton* targetButton = nullptr;
+    QList<QPushButton*> buttons = homePage->findChildren<QPushButton*>();
+
+    for (QPushButton* button : buttons) {
+        if (button->text() == buttonName) {
+            targetButton = button;
+            break;
+        }
+    }
+
+    if (!targetButton) {
+        qDebug() << "未找到按钮:" << buttonName;
+        return;
+    }
+
+    // 根据运行状态更新样式
+    if (isRunning) {
+        // 运行状态样式
+        targetButton->setStyleSheet(R"(
+            QPushButton {
+                background-color: #dcfce7;
+                border: 2px solid #22c55e;
+                border-radius: 12px;
+                padding: 20px;
+                font-size: 14px;
+                font-weight: bold;
+                color: #166534;
+                min-width: 140px;
+                min-height: 120px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: #bbf7d0;
+                border-color: #16a34a;
+                color: #14532d;
+            }
+            QPushButton:pressed {
+                background-color: #a7f3d0;
+                border-color: #15803d;
+                color: #14532d;
+            }
+        )");
+
+        // 可以添加运行状态的额外指示
+        targetButton->setToolTip("正在运行 - 点击停止");
+
+    } else {
+        // 停止状态样式（恢复默认样式）
+        targetButton->setStyleSheet(R"(
+            QPushButton {
+                background-color: #ffffff;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 20px;
+                font-size: 14px;
+                font-weight: bold;
+                color: #334155;
+                min-width: 140px;
+                min-height: 120px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: #f8fafc;
+                border-color: #3b82f6;
+                color: #1e40af;
+            }
+            QPushButton:pressed {
+                background-color: #e2e8f0;
+                border-color: #2563eb;
+                color: #1e40af;
+            }
+        )");
+
+        targetButton->setToolTip("点击启动");
+    }
+
+    // 更新按钮文本（可选）
+
+    qDebug() << "更新按钮状态:" << buttonName << "运行状态:" << isRunning;
+}
+void MainWindow::createSidebar()
+{
+    // 使用成员变量 m_sidebarLayout
+    QVBoxLayout *sidebarLayout = m_sidebarLayout;
+    if (!sidebarLayout) {
+        qWarning() << "Sidebar layout is null!";
+        return;
+    }
+
+    // 清空现有布局内容（如果有）
+    QLayoutItem* item;
+    while ((item = sidebarLayout->takeAt(0)) != nullptr) {
+        if (item->widget()) {
+            item->widget()->deleteLater();
+        }
+        delete item;
+    }
+
+    // ----------- 设备组 -----------
+    QGroupBox *deviceGroup = new QGroupBox("设备", this);
+    deviceGroup->setStyleSheet(
+        "QGroupBox { color:#e2e8f0; font-weight:bold; margin-top:10px; background-color: #1e293b; border: 1px solid #334155; }"
+        "QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 8px; color: #e2e8f0; }");
+    QVBoxLayout *deviceLayout = new QVBoxLayout(deviceGroup);
+    deviceLayout->setContentsMargins(10, 25, 10, 10);
+    deviceLayout->setSpacing(8);
+
+    QPushButton *deviceBtn = new QPushButton("设备监控", this);
+    deviceBtn->setObjectName("PushButton1");
+    deviceBtn->setStyleSheet(
+        "QPushButton { background-color: #475569; color: white; border: none; padding: 8px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #3b82f6; }"
+        "QPushButton:pressed { background-color: #2563eb; }");
+    connect(deviceBtn, &QPushButton::clicked, this, &MainWindow::on_pushButton1_clicked);
+    deviceLayout->addWidget(deviceBtn);
+
+    QPushButton *startBtn = new QPushButton("启动设备", this);
+    startBtn->setObjectName("PushButton3");
+    startBtn->setStyleSheet(
+        "QPushButton { background-color: #475569; color: white; border: none; padding: 8px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #3b82f6; }"
+        "QPushButton:pressed { background-color: #2563eb; }");
+    connect(startBtn, &QPushButton::clicked, this, &MainWindow::on_pushButton3_clicked);
+    deviceLayout->addWidget(startBtn);
+    sidebarLayout->addWidget(deviceGroup);
+
+    // ----------- 工单组 -----------
+    QGroupBox *workGroup = new QGroupBox("工单", this);
+    workGroup->setStyleSheet(
+        "QGroupBox { color:#e2e8f0; font-weight:bold; margin-top:10px; background-color: #1e293b; border: 1px solid #334155; }"
+        "QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 8px; color: #e2e8f0; }");
+    QVBoxLayout *workLayout = new QVBoxLayout(workGroup);
+    workLayout->setContentsMargins(10, 25, 10, 10);
+    workLayout->setSpacing(8);
+
+    QPushButton *listBtn = new QPushButton("工单列表", this);
+    listBtn->setObjectName("PushButton2");
+    listBtn->setStyleSheet(
+        "QPushButton { background-color: #475569; color: white; border: none; padding: 8px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #3b82f6; }"
+        "QPushButton:pressed { background-color: #2563eb; }");
+    connect(listBtn, &QPushButton::clicked, this, &MainWindow::on_pushButton2_clicked);
+    workLayout->addWidget(listBtn);
+    sidebarLayout->addWidget(workGroup);
+
+    // ----------- 会议组 -----------
+    QGroupBox *meetGroup = new QGroupBox("会议", this);
+    meetGroup->setStyleSheet(
+        "QGroupBox { color:#e2e8f0; font-weight:bold; margin-top:10px; background-color: #1e293b; border: 1px solid #334155; }"
+        "QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 8px; color: #e2e8f0; }");
+    QVBoxLayout *meetLayout = new QVBoxLayout(meetGroup);
+    meetLayout->setContentsMargins(10, 25, 10, 10);
+    meetLayout->setSpacing(8);
+
+    QPushButton *meetBtn = new QPushButton("会议管理", this);
+    meetBtn->setObjectName("meetingButton");
+    meetBtn->setStyleSheet(
+        "QPushButton { background-color: #475569; color: white; border: none; padding: 8px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #3b82f6; }"
+        "QPushButton:pressed { background-color: #2563eb; }");
+    connect(meetBtn, &QPushButton::clicked, this, &MainWindow::on_meetingButton_clicked);
+    meetLayout->addWidget(meetBtn);
+    sidebarLayout->addWidget(meetGroup);
+
+    // 添加弹性空间
+    sidebarLayout->addStretch();
+
+    qDebug() << "Sidebar created successfully with" << sidebarLayout->count() << "items";
 }
 
 bool MainWindow::initDatabase()
@@ -132,7 +922,7 @@ bool MainWindow::initDatabase()
       CREATE TABLE IF NOT EXISTS ticket_device_history (
         ticket_id INTEGER NOT NULL,
         history_id INTEGER NOT NULL,
-        PRIMARY KEY(ticket_id, history_id)
+        PRIMARY KEY(ticket_id, history_id)6
     ))");
 
     ui->textEdit->append(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") + " - 数据库初始化完成");
@@ -458,135 +1248,6 @@ void MainWindow::onDisconnected()
     ui->textEdit->append("一个客户端已断开连接。");
 }
 
-void MainWindow::on_pushButton1_clicked()
-{
-    if (ui->pushButton3->text() == "启动设备") {
-        QMessageBox::information(this, "提示", "请先点击“启动设备”按钮！");
-        return;
-    }
-
-    auto *dlg = new DeviceDialog(this);
-    dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->setModal(false);
-
-    // connect(dlg, &DeviceDialog::paramsUpdated, this, [this](const QJsonObject& j){
-    //     if (!activeOrderId_.isEmpty()) broadcastTelemetry(activeOrderId_, j);
-    // });
-    connect(dlg, &DeviceDialog::workOrderCreated, this, [this](int id, const QString& title){
-        activeOrderId_ = QString::number(id);
-        const QString invite = QString("ORDER|INVITE|%1|%2").arg(activeOrderId_, title);
-        broadcastToExperts(invite);
-    });
-
-    dlg->show();
-}
-
-void MainWindow::on_pushButton2_clicked()
-{
-    TicketsDialog *dlg = new TicketsDialog(this);
-    dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->setModal(false);
-    dlg->show();
-}
-
-
-void MainWindow::on_pushButton3_clicked()
-{
-    static bool running = false;
-
-    if (!running) {
-        m_deviceWorker = new DeviceWorker;
-        m_deviceThread = new QThread(this);
-        m_deviceWorker->moveToThread(m_deviceThread);
-        connect(m_deviceThread, &QThread::started, m_deviceWorker, &DeviceWorker::start);
-        connect(m_deviceWorker, &DeviceWorker::finished, m_deviceThread, &QThread::quit, Qt::DirectConnection);
-        connect(m_deviceWorker, &DeviceWorker::finished, m_deviceWorker, &QObject::deleteLater);
-        connect(m_deviceThread, &QThread::finished, m_deviceThread, &QObject::deleteLater);
-
-        connect(m_deviceWorker, &DeviceWorker::newData, this, [this](const DeviceParams &p){
-            ui->statusLineEdit->setText(p.status ? "正常" : "风险");
-            ui->statusLineEdit->setStyleSheet(p.status ? "color: green;" : "color: red;");
-
-            broadcastDeviceParams(p);
-
-            if (!activeOrderId_.isEmpty()) {
-                // 实时推送（专家订阅）
-                QJsonObject obj;
-                obj["ts"]         = p.lastUpdate.toMSecsSinceEpoch();
-                obj["temperature"]= p.temperature;
-                obj["pressure"]   = p.pressure;
-                obj["vibration"]  = p.vibration;
-                obj["current"]    = p.current;
-                obj["voltage"]    = p.voltage;
-                obj["speed"]      = p.speed;
-                obj["status"]     = p.status ? 1 : 0;
-                QJsonArray logs;
-                logs.append(QString("T=%1,P=%2,V=%3").arg(p.temperature,0,'f',1).arg(p.pressure,0,'f',1).arg(p.vibration,0,'f',2));
-                obj["logs"] = logs;
-                broadcastTelemetry(activeOrderId_, obj);
-
-                // 新增：落库 + 关联 + 故障
-                QSqlQuery ins;
-                ins.prepare("INSERT INTO device_history (temperature,pressure,vibration,current,voltage,speed,status,record_time) "
-                            "VALUES (:t,:p,:v,:c,:volt,:spd,:st,:rt)");
-                ins.bindValue(":t",   p.temperature);
-                ins.bindValue(":p",   p.pressure);
-                ins.bindValue(":v",   p.vibration);
-                ins.bindValue(":c",   p.current);
-                ins.bindValue(":volt",p.voltage);
-                ins.bindValue(":spd", p.speed);
-                ins.bindValue(":st",  p.status ? 1 : 0);
-                ins.bindValue(":rt",  p.lastUpdate);
-                if (!ins.exec()) {
-                    ui->textEdit->append("写 device_history 失败: " + ins.lastError().text());
-                } else {
-                    const int hid = ins.lastInsertId().toInt();
-                    QSqlQuery link;
-                    link.prepare("INSERT OR IGNORE INTO ticket_device_history (ticket_id, history_id) VALUES (:tid,:hid)");
-                    link.bindValue(":tid", activeOrderId_.toInt());
-                    link.bindValue(":hid", hid);
-                    if (!link.exec()) {
-                        ui->textEdit->append("写 ticket_device_history 失败: " + link.lastError().text());
-                    }
-                }
-
-                auto addFault = [&](const QString& code, const QString& text, const QString& level){
-                    QSqlQuery f;
-                    f.prepare("INSERT INTO faults (ticket_id, code, text, level, ts) VALUES (:tid,:c,:t,:l,:ts)");
-                    f.bindValue(":tid", activeOrderId_.toInt());
-                    f.bindValue(":c", code);
-                    f.bindValue(":t", text);
-                    f.bindValue(":l", level);
-                    f.bindValue(":ts", p.lastUpdate);
-                    if (!f.exec()) ui->textEdit->append("写 faults 失败: " + f.lastError().text());
-                };
-                if (p.temperature > 70.0) addFault("F_TEMP_HIGH","温度过高","中");
-                if (p.pressure    > 130.0) addFault("F_PRESS_HIGH","压力过高","中");
-                if (p.vibration   > 4.0)   addFault("F_VIB_HIGH", "振动过大","中");
-            }
-        });
-
-        m_deviceThread->start();
-        ui->pushButton3->setText("停止设备");
-        running = true;
-    } else {
-        if (m_deviceWorker) QMetaObject::invokeMethod(m_deviceWorker, "stop", Qt::QueuedConnection);
-        ui->pushButton3->setText("启动设备");
-        running = false;
-    }
-}
-
-void MainWindow::on_meetingButton_clicked()
-{
-    if (!meetingRoom) {
-        meetingRoom = new MeetingRoomDialog(this);
-        connect(meetingRoom, &MeetingRoomDialog::meetingClosed, this, [this]() {
-            meetingRoom->deleteLater();
-            meetingRoom = nullptr;
-        });
-    }
-    meetingRoom->show();
-}
 
 void MainWindow::broadcastDeviceParams(const DeviceParams &params)
 {

@@ -16,7 +16,7 @@ TicketsDialog::TicketsDialog(QWidget *parent)
 {
     ui->setupUi(this);
     setWindowTitle("工单列表");
-
+    setupUI();
     // 绑定刷新按钮
     connect(ui->refreshButton, &QPushButton::clicked,
             this, &TicketsDialog::refreshTable);
@@ -90,11 +90,6 @@ void TicketsDialog::changeTickets()
     }
 }
 
-void TicketsDialog::on_pushButton_clicked()
-{
-    close();
-}
-
 void TicketsDialog::on_refreshButton_clicked()
 {
     refreshTable();
@@ -121,3 +116,110 @@ void TicketsDialog::on_changeButton_clicked()
     changeTickets();
 }
 
+void TicketsDialog::setupUI()
+{
+    // 设置对话框基本属性
+    this->setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    this->setFixedSize(2000, 1400); // 固定大小适应2/3区域
+
+    // 创建主布局
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setSpacing(10);
+    mainLayout->setContentsMargins(15, 15, 15, 15);
+
+    // 创建标题标签
+    QLabel *titleLabel = new QLabel("工单管理系统", this);
+    titleLabel->setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #2c3e50; }");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(titleLabel);
+
+    // 创建按钮工具栏
+    QWidget *buttonWidget = new QWidget(this);
+    QHBoxLayout *buttonLayout = new QHBoxLayout(buttonWidget);
+    buttonLayout->setSpacing(10);
+    buttonLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 刷新按钮
+    ui->refreshButton = new QPushButton("刷新", buttonWidget);
+    ui->refreshButton->setIcon(QIcon(":/icons/refresh.svg"));
+    ui->refreshButton->setStyleSheet(
+        "QPushButton { padding: 8px 16px; background-color: #3498db; color: white; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #2980b9; }"
+        );
+
+    // 修改按钮
+    ui->changeButton = new QPushButton("修改工单", buttonWidget);
+    ui->changeButton->setIcon(QIcon(":/icons/edit.svg"));
+    ui->changeButton->setStyleSheet(
+        "QPushButton { padding: 8px 16px; background-color: #f39c12; color: white; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #e67e22; }"
+        );
+
+    // 删除按钮
+    ui->deleteButton = new QPushButton("清空工单", buttonWidget);
+    ui->deleteButton->setIcon(QIcon(":/icons/delete.svg"));
+    ui->deleteButton->setStyleSheet(
+        "QPushButton { padding: 8px 16px; background-color: #e74c3c; color: white; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #c0392b; }"
+        );
+
+    // 关闭按钮
+    ui->pushButton = new QPushButton("关闭", buttonWidget);
+    ui->pushButton->setIcon(QIcon(":/icons/close.svg"));
+    ui->pushButton->setStyleSheet(
+        "QPushButton { padding: 8px 16px; background-color: #7f8c8d; color: white; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #636e72; }"
+        );
+
+    // 添加按钮到布局
+    buttonLayout->addWidget(ui->refreshButton);
+    buttonLayout->addWidget(ui->changeButton);
+    buttonLayout->addWidget(ui->deleteButton);
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(ui->pushButton);
+
+    mainLayout->addWidget(buttonWidget);
+
+    // 创建表格视图
+    ui->tableViewTickets = new QTableView(this);
+    ui->tableViewTickets->setStyleSheet(
+        "QTableView {"
+        "   border: 1px solid #bdc3c7;"
+        "   border-radius: 4px;"
+        "   background-color: #ffffff;"
+        "   gridline-color: #ecf0f1;"
+        "}"
+        "QTableView::item:selected {"
+        "   background-color: #3498db;"
+        "   color: white;"
+        "}"
+        "QHeaderView::section {"
+        "   background-color: #34495e;"
+        "   color: white;"
+        "   padding: 6px;"
+        "   border: none;"
+        "}"
+        );
+
+    // 设置表格属性
+    ui->tableViewTickets->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableViewTickets->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->tableViewTickets->setAlternatingRowColors(true);
+    ui->tableViewTickets->setSortingEnabled(true);
+    ui->tableViewTickets->horizontalHeader()->setStretchLastSection(true);
+    ui->tableViewTickets->verticalHeader()->setVisible(false);
+
+    mainLayout->addWidget(ui->tableViewTickets, 1); // 表格占据剩余空间
+
+    // 状态栏
+    QLabel *statusLabel = new QLabel("双击工单可查看详细信息", this);
+    statusLabel->setStyleSheet("QLabel { color: #7f8c8d; font-size: 12px; }");
+    statusLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(statusLabel);
+
+    // 连接信号槽
+    connect(ui->refreshButton, &QPushButton::clicked, this, &TicketsDialog::refreshTable);
+    connect(ui->changeButton, &QPushButton::clicked, this, &TicketsDialog::changeTickets);
+    connect(ui->deleteButton, &QPushButton::clicked, this, &TicketsDialog::on_deleteButton_clicked);
+    connect(ui->pushButton, &QPushButton::clicked, this, &TicketsDialog::close);
+}

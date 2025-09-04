@@ -3,7 +3,7 @@
 
 #include <QDialog>
 #include <QSqlQueryModel>
-
+#include <QTableView>
 QT_BEGIN_NAMESPACE
 namespace Ui { class TicketsDialog; }
 QT_END_NAMESPACE
@@ -15,10 +15,9 @@ class TicketsDialog : public QDialog
 public:
     explicit TicketsDialog(QWidget *parent = nullptr);
     ~TicketsDialog();
-
+    void setupUI();
 private slots:
     void refreshTable();   // 手动刷新槽
-    void on_pushButton_clicked();
     void on_refreshButton_clicked();
     void on_deleteButton_clicked();
     void changeTickets();
@@ -27,6 +26,11 @@ private slots:
 private:
     Ui::TicketsDialog *ui;
     QSqlQueryModel *model;
+    QPushButton *refreshButton;
+    QPushButton *changeButton;
+    QPushButton *deleteButton;
+    QPushButton *pushButton;
+    QTableView *tableViewTickets;
 };
 
 #endif // TICKETSDIALOG_H

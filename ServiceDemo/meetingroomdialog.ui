@@ -16,8 +16,8 @@
   <widget class="QLabel" name="statusLabel">
    <property name="geometry">
     <rect>
-     <x>10</x>
-     <y>910</y>
+     <x>-151</x>
+     <y>1019</y>
      <width>251</width>
      <height>41</height>
     </rect>
@@ -29,23 +29,23 @@
   <widget class="QLabel" name="clientCountLabel">
    <property name="geometry">
     <rect>
-     <x>10</x>
-     <y>10</y>
+     <x>607</x>
+     <y>851</y>
      <width>251</width>
      <height>41</height>
     </rect>
    </property>
    <property name="text">
-    <string>clientCountLabel</string>
+    <string/>
    </property>
   </widget>
   <widget class="QPushButton" name="startMeetingButton">
    <property name="geometry">
     <rect>
-     <x>80</x>
-     <y>80</y>
-     <width>171</width>
-     <height>51</height>
+     <x>600</x>
+     <y>881</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="text">
@@ -55,10 +55,10 @@
   <widget class="QPushButton" name="closeMeetingButton">
    <property name="geometry">
     <rect>
-     <x>80</x>
-     <y>160</y>
-     <width>171</width>
-     <height>51</height>
+     <x>600</x>
+     <y>961</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="text">
@@ -68,40 +68,40 @@
   <widget class="QTextEdit" name="chatTextEdit">
    <property name="geometry">
     <rect>
-     <x>70</x>
-     <y>380</y>
-     <width>731</width>
-     <height>411</height>
+     <x>620</x>
+     <y>880</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
   </widget>
   <widget class="QLineEdit" name="messageLineEdit">
    <property name="geometry">
     <rect>
-     <x>70</x>
-     <y>290</y>
-     <width>521</width>
-     <height>61</height>
+     <x>650</x>
+     <y>941</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
   </widget>
   <widget class="QListWidget" name="clientListWidget">
    <property name="geometry">
     <rect>
-     <x>320</x>
-     <y>30</y>
-     <width>411</width>
-     <height>231</height>
+     <x>790</x>
+     <y>851</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
   </widget>
   <widget class="QPushButton" name="sendButton">
    <property name="geometry">
     <rect>
-     <x>620</x>
-     <y>290</y>
-     <width>113</width>
-     <height>30</height>
+     <x>792</x>
+     <y>910</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="text">
@@ -111,10 +111,10 @@
   <widget class="QPushButton" name="broadcastButton">
    <property name="geometry">
     <rect>
-     <x>370</x>
-     <y>820</y>
-     <width>113</width>
-     <height>30</height>
+     <x>470</x>
+     <y>950</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="text">
@@ -125,78 +125,63 @@
    <property name="geometry">
     <rect>
      <x>770</x>
-     <y>40</y>
-     <width>113</width>
-     <height>30</height>
+     <y>830</y>
+     <width>20</width>
+     <height>16</height>
     </rect>
    </property>
    <property name="text">
     <string>踢出</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="startVideoButton">
-   <property name="geometry">
-    <rect>
-     <x>1170</x>
-     <y>60</y>
-     <width>95</width>
-     <height>25</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>PushButton</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="stopVideoButton">
-   <property name="geometry">
-    <rect>
-     <x>1330</x>
-     <y>60</y>
-     <width>95</width>
-     <height>25</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>PushButton</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="localVideoLabel">
-   <property name="geometry">
-    <rect>
-     <x>920</x>
-     <y>350</y>
-     <width>381</width>
-     <height>311</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string/>
-   </property>
-  </widget>
-  <widget class="QLabel" name="remoteVideoLabel">
-   <property name="geometry">
-    <rect>
-     <x>1400</x>
-     <y>340</y>
-     <width>361</width>
-     <height>351</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string/>
-   </property>
-  </widget>
   <widget class="QPushButton" name="sendImageButton">
    <property name="geometry">
     <rect>
-     <x>620</x>
-     <y>330</y>
-     <width>111</width>
-     <height>30</height>
+     <x>790</x>
+     <y>950</y>
+     <width>20</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="text">
     <string>发送图片</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>720</x>
+     <y>880</y>
+     <width>160</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="videoGridLayout"/>
+  </widget>
+  <widget class="QPushButton" name="stopVideoButton">
+   <property name="geometry">
+    <rect>
+     <x>860</x>
+     <y>960</y>
+     <width>158</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PushButton</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="startVideoButton">
+   <property name="geometry">
+    <rect>
+     <x>880</x>
+     <y>930</y>
+     <width>158</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PushButton</string>
    </property>
   </widget>
  </widget>

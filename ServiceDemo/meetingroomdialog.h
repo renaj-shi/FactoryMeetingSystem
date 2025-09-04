@@ -7,7 +7,8 @@
 #include <QSet>
 #include <QMap>
 #include <QJsonObject>
-
+#include <QGridLayout>
+#include <QLabel>
 // 添加多媒体支持
 #ifdef QT_MULTIMEDIA_LIB
 #include <QCamera>
@@ -55,7 +56,7 @@ private slots:
     void sendImageFromServer(const QString &imagePath);
     void handleAudioData(QTcpSocket* socket, const QByteArray& data);
 
-    private:
+private:
     // 原有私有函数...
     void addSystemMessage(const QString& message);
     void handleChatMessage(QTcpSocket* socket, const QJsonObject& json);
@@ -74,12 +75,31 @@ private slots:
 #endif
 
 private:
+    QList<QWidget*> videoFrames;
+    QList<QLabel*> videoLabels;
+    QList<QLabel*> infoLabels;
+    QMap<QString, int> userFrameMap; // 用户名到框架索引的映射
+
+    // 添加以下函数声明
+    void initVideoFrames();
+    void assignVideoFrame(const QString &username, const QString &userType);
+    void releaseVideoFrame(const QString &username);
     Ui::MeetingRoomDialog *ui;
     QTcpServer *meetingServer;
     QSet<QTcpSocket*> meetingClients;
     QMap<QTcpSocket*, QString> clientUsers;
     QMap<QTcpSocket*, QString> clientTypes;
     QMap<QString, QTcpSocket*> userSockets;
+
+    void setupUI();
+    void addVideoWindow(const QString &username, const QString &userType);
+    void removeVideoWindow(const QString &username);
+    void updateVideoLayout();
+    void forwardVideoFrame(QTcpSocket *senderSocket,
+                           const QString &fromUser,
+                           const QByteArray &base64Jpeg);
+    QGridLayout *videoGridLayout; // 视频网格布局
+    QMap<QString, QLabel*> videoWindows; // 用户名 -> 视频标签
 
     // 新增视频功能成员变量
 #ifdef QT_MULTIMEDIA_LIB

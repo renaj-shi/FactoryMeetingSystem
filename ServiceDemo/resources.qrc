@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/windowed.svg</file>
+        <file>icons/minimize.svg</file>
+        <file>icons/maximize.svg</file>
+        <file>icons/factory.png</file>
+        <file>icons/close.svg</file>
+        <file>icons/start.svg</file>
+        <file>icons/meeting.svg</file>
+        <file>icons/device.svg</file>
+        <file>icons/ticket.svg</file>
+    </qresource>
+</RCC>

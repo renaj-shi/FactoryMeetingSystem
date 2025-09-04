@@ -1,6 +1,5 @@
 #include "devicedialog.h"
 #include "ui_devicedialog.h"
-
 #include <QtCharts>
 #include <QRandomGenerator>
 #include <QDateTime>
@@ -27,6 +26,7 @@ DeviceDialog::DeviceDialog(QWidget *parent) :
     model2(new QSqlQueryModel(this))
 {
     ui->setupUi(this);
+    setupUI();  // 改用自定义的setupUI
     setWindowTitle("设备参数监控");
 
     // 只创建一次计时器
@@ -121,7 +121,7 @@ void DeviceDialog::onUpdateTimer()
     setDeviceParams();
 }
 
-void DeviceDialog::on_close_clicked()
+void DeviceDialog::on_closeButton_clicked()
 {
     close();
 }
@@ -300,5 +300,152 @@ void DeviceDialog::on_cautionButton_clicked()
     } else {
         QMessageBox::critical(this, "错误",
                               QString("工单创建失败: %1").arg(query.lastError().text()));
+    }
+}
+void DeviceDialog::setupUI()
+{
+    // 设置对话框基本属性
+    this->setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    this->setFixedSize(2000, 1400); // 适应2/3屏幕区域
+
+    // 创建主布局
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setSpacing(15);
+    mainLayout->setContentsMargins(20, 20, 20, 20);
+
+    // 创建标题标签
+    QLabel *titleLabel = new QLabel("设备参数实时监控", this);
+    titleLabel->setStyleSheet("QLabel { font-size: 20px; font-weight: bold; color: #2c3e50; padding: 10px; }");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(titleLabel);
+
+    // 创建设备状态网格布局
+    QGroupBox *statusGroup = new QGroupBox("", this);
+    statusGroup->setStyleSheet("QGroupBox { font-weight: bold; font-size: 14px; }");
+    QGridLayout *statusLayout = new QGridLayout(statusGroup);
+
+    // 创建状态标签
+    QLabel *labels[] = {
+        new QLabel("温度:", statusGroup), new QLabel("压力:", statusGroup),
+        new QLabel("振动:", statusGroup), new QLabel("电流:", statusGroup),
+        new QLabel("电压:", statusGroup), new QLabel("转速:", statusGroup),
+        new QLabel("状态:", statusGroup), new QLabel("更新时间:", statusGroup)
+    };
+
+    // 创建显示数值的标签
+    ui->tempLabel = new QLabel("0.0 °C", statusGroup);
+    ui->pressureLabel = new QLabel("0.0 kPa", statusGroup);
+    ui->vibrationLabel = new QLabel("0.0 mm/s", statusGroup);
+    ui->currentLabel = new QLabel("0.0 A", statusGroup);
+    ui->voltageLabel = new QLabel("0.0 V", statusGroup);
+    ui->speedLabel = new QLabel("0 RPM", statusGroup);
+    ui->statusLabel = new QLabel("停止", statusGroup);
+    ui->updateTimeLabel = new QLabel("-", statusGroup);
+
+    // 设置数值标签样式
+    QString valueStyle = "QLabel { font-weight: bold; font-size: 13px; min-width: 100px; }";
+    ui->tempLabel->setStyleSheet(valueStyle);
+    ui->pressureLabel->setStyleSheet(valueStyle);
+    ui->vibrationLabel->setStyleSheet(valueStyle);
+    ui->currentLabel->setStyleSheet(valueStyle);
+    ui->voltageLabel->setStyleSheet(valueStyle);
+    ui->speedLabel->setStyleSheet(valueStyle);
+    ui->statusLabel->setStyleSheet(valueStyle + "color: red;");
+    ui->updateTimeLabel->setStyleSheet(valueStyle);
+
+    // 添加到网格布局
+    for (int i = 0; i < 8; ++i) {
+        statusLayout->addWidget(labels[i], i % 4, (i / 4) * 2);
+        statusLayout->addWidget(getValueLabel(i), i % 4, (i / 4) * 2 + 1);
+    }
+
+    mainLayout->addWidget(statusGroup);
+
+    // 创建功能按钮区域
+    QWidget *buttonWidget = new QWidget(this);
+    QHBoxLayout *buttonLayout = new QHBoxLayout(buttonWidget);
+    buttonLayout->setSpacing(10);
+    buttonLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 创建按钮
+    ui->pushButton = new QPushButton("生成趋势图", buttonWidget);
+    ui->pushButton_2 = new QPushButton("刷新历史", buttonWidget);
+    ui->deleteHistoryButton = new QPushButton("清空历史", buttonWidget);
+    ui->cautionButton = new QPushButton("创建工单", buttonWidget);
+    ui->closeButton = new QPushButton("关闭", buttonWidget);
+
+    // 设置按钮样式
+    QString buttonStyle = "QPushButton { padding: 8px 16px; border-radius: 4px; }";
+    ui->pushButton->setStyleSheet(buttonStyle + "background-color: #3498db; color: white;");
+    ui->pushButton_2->setStyleSheet(buttonStyle + "background-color: #2ecc71; color: white;");
+    ui->deleteHistoryButton->setStyleSheet(buttonStyle + "background-color: #e74c3c; color: white;");
+    ui->cautionButton->setStyleSheet(buttonStyle + "background-color: #f39c12; color: white;");
+    ui->closeButton->setStyleSheet(buttonStyle + "background-color: #7f8c8d; color: white;");
+
+    // 添加到按钮布局
+    buttonLayout->addWidget(ui->pushButton);
+    buttonLayout->addWidget(ui->pushButton_2);
+    buttonLayout->addWidget(ui->deleteHistoryButton);
+    buttonLayout->addWidget(ui->cautionButton);
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(ui->closeButton);
+
+    mainLayout->addWidget(buttonWidget);
+
+    // 创建组合框用于选择图表列
+    QWidget *comboWidget = new QWidget(this);
+    QHBoxLayout *comboLayout = new QHBoxLayout(comboWidget);
+    comboLayout->setContentsMargins(0, 0, 0, 0);
+
+    QLabel *comboLabel = new QLabel("选择图表数据:", comboWidget);
+    ui->comboBox = new QComboBox(comboWidget);
+    ui->comboBox->addItems({"温度", "压力", "振动", "电流", "电压", "转速"});
+
+    comboLayout->addWidget(comboLabel);
+    comboLayout->addWidget(ui->comboBox);
+    comboLayout->addStretch();
+
+    mainLayout->addWidget(comboWidget);
+
+    // 创建历史数据表格
+    ui->tableHistoryView = new QTableView(this);
+    ui->tableHistoryView->setStyleSheet(
+        "QTableView {"
+        "   border: 1px solid #bdc3c7;"
+        "   border-radius: 4px;"
+        "   background-color: #ffffff;"
+        "   gridline-color: #ecf0f1;"
+        "}"
+        "QTableView::item:selected {"
+        "   background-color: #3498db;"
+        "   color: white;"
+        "}"
+        );
+    ui->tableHistoryView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableHistoryView->setAlternatingRowColors(true);
+
+    mainLayout->addWidget(ui->tableHistoryView, 1); // 表格占据剩余空间
+
+    // 连接信号槽
+    connect(ui->pushButton, &QPushButton::clicked, this, &DeviceDialog::on_pushButton_clicked);
+    connect(ui->pushButton_2, &QPushButton::clicked, this, &DeviceDialog::on_pushButton_2_clicked);
+    connect(ui->deleteHistoryButton, &QPushButton::clicked, this, &DeviceDialog::on_deleteHistoryButton_clicked);
+    connect(ui->cautionButton, &QPushButton::clicked, this, &DeviceDialog::on_cautionButton_clicked);
+    connect(ui->closeButton, &QPushButton::clicked, this, &DeviceDialog::on_closeButton_clicked);
+}
+
+// 辅助函数：获取对应的数值标签
+QLabel* DeviceDialog::getValueLabel(int index)
+{
+    switch (index) {
+    case 0: return ui->tempLabel;
+    case 1: return ui->pressureLabel;
+    case 2: return ui->vibrationLabel;
+    case 3: return ui->currentLabel;
+    case 4: return ui->voltageLabel;
+    case 5: return ui->speedLabel;
+    case 6: return ui->statusLabel;
+    case 7: return ui->updateTimeLabel;
+    default: return nullptr;
     }
 }

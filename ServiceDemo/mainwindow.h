@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QJsonObject>
+#include <QVBoxLayout>
 
 // 你工程已有
 #include "meetingroomdialog.h"
@@ -62,13 +63,17 @@ private slots:
     void on_pushButton3_clicked();  // 启停设备模拟
     void showTicketsDialog();
 
+    //标签栏事件
+    void on_tabBar_currentChanged(int index);
+    void on_tabBar_tabCloseRequested(int index);
+
 private:
     // 业务辅助
     bool initDatabase();
     void handleLogin(QTcpSocket *socket, const QString &username, const QString &password, const QString &clientType);
     void handleRegister(QTcpSocket *socket, const QString &username, const QString &password, const QString &clientType);
     void handleCreateTicket(QTcpSocket *socket, const QStringList &parts);
-
+    void handleDeviceData(const DeviceParams &p);
     // 发送/广播
     void sendResponse(QTcpSocket *socket, const QString &response);
     void sendToExpert(QTcpSocket* s, const QString& line);
@@ -85,16 +90,22 @@ private:
     void handleTicketLogs(QTcpSocket* socket, int ticketId, int page, int pageSize);
     void handleFaultsByTicket(QTcpSocket* socket, int ticketId, int page, int pageSize);
 
+    //新建UI
+    void setupUI();
+    void createSidebar();
+    void createEmptyStatePage();
+    void updateHomeButtonState(const QString &buttonName, bool isRunning);
 private:
     Ui::MainWindow *ui{nullptr};
     QTcpServer *factoryServer{nullptr};
     QTcpServer *expertServer{nullptr};
     QSqlDatabase db;
-
+    QVBoxLayout* m_sidebarLayout = nullptr;
     // 在线客户端类型映射与账号映射
     QMap<QTcpSocket*, QString> clientTypeMap;              // socket -> FACTORY / EXPERT
     QMap<QTcpSocket*, QString> m_socketToUsername;         // socket -> 登录名
     QMap<QString, QTcpSocket*> m_factorySockets;           // 工厂用户名 -> socket
+    QStringList m_tabFeatureNames;
 
     // 专家/工厂在线/参与关系
     QSet<QTcpSocket*> expertSockets;                       // 在线专家集合
@@ -103,7 +114,7 @@ private:
     QHash<QString, QSet<QTcpSocket*>> teleSubs;            // 工单 -> 订阅设备数据的专家集合
     QHash<QTcpSocket*, QString> expertJoinedOrder;         // 专家 -> 已加入工单
     QHash<QTcpSocket*, QString> factoryJoinedOrder;        // 工厂 -> 已加入工单
-
+    QMap<QString, int> m_featurePageMap; // 功能名称到页面索引的映射
     // 设备与会话
     DeviceWorker *m_deviceWorker{nullptr};
     QThread      *m_deviceThread{nullptr};
@@ -111,6 +122,17 @@ private:
 
     // 活跃工单（可选）
     QString activeOrderId_;
+
+    //UI
+    QAtomicInt m_deviceRunning;
+    void createDefaultHomePage();
+    void ensureHomeTabExists();
+    QPushButton* createHomeButton(const QString &text, const QString &iconPath);
+    void openFeatureInTab(const QString &featureName, const QString &tabName);
+    void recreateFeaturePage(const QString &featureName);
+    QString getTabNameFromFeature(const QString& featureName);
+    void removeFeaturePage(const QString& featureName);
+    QWidget* createHomePage();
 };
 
 #endif // MAINWINDOW_H
