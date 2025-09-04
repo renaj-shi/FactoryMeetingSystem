@@ -1,5 +1,6 @@
 #include "devicemonitorpanel.h"
 #include "ui_devicemonitorpanel.h"
+#include "devicelinechartdialog.h"
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -149,6 +150,22 @@ QWidget* DeviceMonitorPanel::createDeviceBar(const DeviceInfo &device)
     
     // 添加伸缩项，确保设备名称和状态指示器靠左显示
     layout->addStretch();
+    
+    // 添加折线图按钮
+    QPushButton *chartButton = new QPushButton("折线图", deviceBar);
+    chartButton->setObjectName("chartButton");
+    chartButton->setStyleSheet(
+        "QPushButton { background-color: #3b82f6; color: white; border-radius: 4px; padding: 5px 10px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #2563eb; }"
+        "QPushButton:pressed { background-color: #1d4ed8; }"
+    );
+    chartButton->setMinimumWidth(60);
+    layout->addWidget(chartButton);
+    
+    // 连接折线图按钮点击信号
+    connect(chartButton, &QPushButton::clicked, this, [=]() {
+        onChartButtonClicked(device);
+    });
     
     // 箭头指示器（放在最右边）
     QLabel *arrowLabel = new QLabel("▼", deviceBar);
@@ -395,6 +412,14 @@ void DeviceMonitorPanel::updateData()
         updateDeviceBar(deviceId);
         // 无论抽屉是否可见，都更新参数数据，确保打开时能看到最新值
         updateParameterDrawer(deviceId);
+        
+        // 如果折线图对话框存在且可见，更新图表数据
+        if (m_chartDialogs.contains(deviceId) && m_chartDialogs[deviceId]->isVisible()) {
+            DeviceInfo *devicePtr = m_deviceManager.getDevice(deviceId);
+            if (devicePtr) {
+                m_chartDialogs[deviceId]->updateChartData(*devicePtr);
+            }
+        }
     }
 }
 
@@ -416,6 +441,37 @@ void DeviceMonitorPanel::startTimer()
     if (m_updateTimer && !m_updateTimer->isActive()) {
         m_updateTimer->start(1000); // 每秒更新一次
     }
+}
+
+void DeviceMonitorPanel::onChartButtonClicked(const DeviceInfo &device)
+{
+    QString deviceId = device.deviceId();
+    
+    // 检查是否已经存在该设备的折线图对话框
+    if (m_chartDialogs.contains(deviceId)) {
+        // 如果对话框已经存在，显示它
+        DeviceLineChartDialog *dialog = m_chartDialogs[deviceId];
+        dialog->show();
+        dialog->raise();
+        dialog->activateWindow();
+        return;
+    }
+    
+    // 创建新的折线图对话框
+    DeviceLineChartDialog *dialog = new DeviceLineChartDialog(device, this);
+    
+    // 连接关闭信号，当对话框关闭时从映射中移除
+    connect(dialog, &QDialog::finished, this, [=](int result) {
+        Q_UNUSED(result);
+        m_chartDialogs.remove(deviceId);
+        dialog->deleteLater();
+    });
+    
+    // 保存到映射中
+    m_chartDialogs[deviceId] = dialog;
+    
+    // 显示对话框
+    dialog->show();
 }
 
 void DeviceMonitorPanel::stopTimer()

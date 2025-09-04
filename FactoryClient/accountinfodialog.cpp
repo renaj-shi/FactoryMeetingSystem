@@ -1,5 +1,6 @@
 #include "accountinfodialog.h"
 #include "ui_accountinfodialog.h"
+#include <QMessageBox>
 
 AccountInfoDialog::AccountInfoDialog(QWidget *parent) :
     QWidget(parent),
@@ -40,6 +41,10 @@ void AccountInfoDialog::on_logoutButton_clicked()
 void AccountInfoDialog::on_profileButton_clicked()
 {
     emit profileEditRequested();
+    
+    // 弹出窗口显示用户名
+    QString username = ui->usernameLabel->text();
+    QMessageBox::information(this, "个人资料", "用户名: " + username);
 }
 
 void AccountInfoDialog::on_passwordButton_clicked()

@@ -13,9 +13,6 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QDebug>
-#include <QBuffer>
-#include <QFile>
-#include <QFileInfo>
 #include <QFileDialog>
 #include <QDateTime>
 #include <QTextDocument>
@@ -26,17 +23,16 @@
 #include <QPixmap>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#ifdef QT_MULTIMEDIA_LIB
-#include <QCameraInfo>
-#endif
 
 MeetingDialog::MeetingDialog(const QString &username,
                              const QString &server,
-                             int port,
+                             int port,  // 改为 int
                              const QString &meetingId,
                              QWidget *parent)
     : QDialog(parent)
     , username(username)
+    , serverHost_(server.isEmpty() ? "127.0.0.1" : server)
+    , serverPort_(port > 0 ? port : 12347)
     , isInMeeting(false)
     , tcpSocket(nullptr)
     , chatTextEdit(nullptr)
@@ -44,21 +40,14 @@ MeetingDialog::MeetingDialog(const QString &username,
     , sendButton(nullptr)
     , joinMeetingButton(nullptr)
     , leaveMeetingButton(nullptr)
-    , localVideoLabel(nullptr)
-    , remoteVideoLabel(nullptr)
-    , startVideoButton(nullptr)
-    , stopVideoButton(nullptr)
-    , videoContainer(nullptr)
-    , fakeVideoThread(nullptr)
     , audioProcessor(new AudioProcessor(this))
     , audioButton(nullptr)
 {
     setWindowTitle("远程会议室 - " + username);
-    //resize(1000, 700);
+    resize(800, 600);
 
     setupUI();
-    //设置视频【new】
-    setupVideoUI();
+
     // 创建TCP socket
     tcpSocket = new QTcpSocket(this);
 
@@ -73,17 +62,16 @@ MeetingDialog::MeetingDialog(const QString &username,
     leaveMeetingButton->setEnabled(false);
     joinMeetingButton->setEnabled(true);
     sendButton->setEnabled(false);
-    startVideoButton->setEnabled(false);
-    stopVideoButton->setEnabled(false);
 
-    // 初始化音频处理器
+     // 初始化音频处理器
     if (!audioProcessor->initialize()) {
         QMessageBox::warning(this, "音频错误", "无法初始化音频设备");
     }
-    addMessageToChat("系统", "正在连接到会议服务器...");
 
-    // 连接到服务器
-    tcpSocket->connectToHost(server, port);
+    addMessageToChat("系统", QString("正在连接到会议服务器 %1:%2 ...").arg(serverHost_).arg(serverPort_));
+
+    // 用参数连接，不要写死
+    tcpSocket->connectToHost(serverHost_, serverPort_);
 }
 
 MeetingDialog::~MeetingDialog()
@@ -94,55 +82,47 @@ MeetingDialog::~MeetingDialog()
     if (tcpSocket && tcpSocket->state() == QAbstractSocket::ConnectedState) {
         tcpSocket->disconnectFromHost();
     }
-#ifdef QT_MULTIMEDIA_LIB
-    stopVideo();
-#endif
 }
 
 void MeetingDialog::setupUI()
 {
-    QHBoxLayout *mainLayout = new QHBoxLayout(this); // 改为水平布局
-
-    // 左侧：聊天区域
-    QWidget *chatWidget = new QWidget(this);
-    QVBoxLayout *chatLayout = new QVBoxLayout(chatWidget);
-    chatLayout->setContentsMargins(0, 0, 0, 0);
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
     // 标题
-    QLabel *titleLabel = new QLabel("远程会议室 - " + username, chatWidget);
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 10px;");
-    chatLayout->addWidget(titleLabel);
+    QLabel *titleLabel = new QLabel("远程会议室", this);
+    titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 10px;");
+    mainLayout->addWidget(titleLabel);
 
     // 聊天区域
-    chatTextEdit = new QTextEdit(chatWidget);
+    chatTextEdit = new QTextEdit(this);
     chatTextEdit->setReadOnly(true);
     chatTextEdit->setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;");
-    chatLayout->addWidget(chatTextEdit, 1);
+    mainLayout->addWidget(chatTextEdit, 1);
 
     // 消息输入区域
     QHBoxLayout *inputLayout = new QHBoxLayout();
-    messageEdit = new QLineEdit(chatWidget);
+    messageEdit = new QLineEdit(this);
     messageEdit->setPlaceholderText("输入消息...");
     messageEdit->setStyleSheet("padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;");
 
-    sendButton = new QPushButton("发送", chatWidget);
+    sendButton = new QPushButton("发送", this);
     sendButton->setStyleSheet(
         "QPushButton { background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 4px; border: none; }"
         "QPushButton:hover { background-color: #2563eb; }"
         "QPushButton:disabled { background-color: #cbd5e1; }"
         );
 
-        // 添加发送图片按钮
+     // 添加发送图片按钮
     sendImageButton = new QPushButton("发送图片", this);
     sendImageButton->setStyleSheet(
         "QPushButton { background-color: #8b5cf6; color: white; padding: 8px 16px; border-radius: 4px; border: none; }"
         "QPushButton:hover { background-color: #7c3aed; }"
         "QPushButton:disabled { background-color: #cbd5e1; }"
         );
-
+    
     inputLayout->addWidget(messageEdit, 1);
     inputLayout->addWidget(sendButton);
-    chatLayout->addLayout(inputLayout);
+    mainLayout->addLayout(inputLayout);
     inputLayout->addWidget(sendImageButton);
 
     // 添加音频控制按钮
@@ -156,13 +136,13 @@ void MeetingDialog::setupUI()
 
     // 会议控制按钮
     QHBoxLayout *controlLayout = new QHBoxLayout();
-    joinMeetingButton = new QPushButton("加入会议", chatWidget);
+    joinMeetingButton = new QPushButton("加入会议", this);
     joinMeetingButton->setStyleSheet(
         "QPushButton { background-color: #10b981; color: white; padding: 10px 20px; border-radius: 4px; border: none; }"
         "QPushButton:hover { background-color: #059669; }"
         );
 
-    leaveMeetingButton = new QPushButton("离开会议", chatWidget);
+    leaveMeetingButton = new QPushButton("离开会议", this);
     leaveMeetingButton->setStyleSheet(
         "QPushButton { background-color: #ef4444; color: white; padding: 10px 20px; border-radius: 4px; border: none; }"
         "QPushButton:hover { background-color: #dc2626; }"
@@ -172,9 +152,7 @@ void MeetingDialog::setupUI()
     controlLayout->addWidget(joinMeetingButton);
     controlLayout->addWidget(leaveMeetingButton);
     controlLayout->addStretch();
-    chatLayout->addLayout(controlLayout);
-
-    mainLayout->addWidget(chatWidget, 2); // 聊天区域占2份
+    mainLayout->addLayout(controlLayout);
 
     // 连接按钮信号
     connect(joinMeetingButton, &QPushButton::clicked, this, &MeetingDialog::onJoinMeetingClicked);
@@ -187,77 +165,13 @@ void MeetingDialog::setupUI()
     // 连接音频处理器信号
     connect(audioProcessor, &AudioProcessor::audioDataReady, this, &MeetingDialog::onAudioDataReady);
     
-}
-void MeetingDialog::setupVideoUI()
-{
-    // 右侧：视频区域
-    QWidget *videoWidget = new QWidget(this);
-    QVBoxLayout *videoLayout = new QVBoxLayout(videoWidget);
-    videoLayout->setContentsMargins(10, 0, 0, 0);
-
-    // 视频标题
-    QLabel *videoTitle = new QLabel("视频通话", videoWidget);
-    videoTitle->setStyleSheet("font-size: 14px; font-weight: bold; color: #1e293b; margin-bottom: 10px;");
-    videoLayout->addWidget(videoTitle);
-
-    // 视频容器
-    videoContainer = new QWidget(videoWidget);
-    videoContainer->setStyleSheet("background-color: #000; border-radius: 4px;");
-    QVBoxLayout *containerLayout = new QVBoxLayout(videoContainer);
-
-    // 本地视频标签
-    localVideoLabel = new QLabel("本地视频", videoContainer);
-    localVideoLabel->setAlignment(Qt::AlignCenter);
-    localVideoLabel->setStyleSheet("background-color: #2d3748; color: white; border: 1px solid #4a5568; min-height: 150px;");
-    localVideoLabel->setMinimumSize(320, 180);
-    containerLayout->addWidget(localVideoLabel);
-
-    // 远程视频标签
-    remoteVideoLabel = new QLabel("远程视频", videoContainer);
-    remoteVideoLabel->setAlignment(Qt::AlignCenter);
-    remoteVideoLabel->setStyleSheet("background-color: #2d3748; color: white; border: 1px solid #4a5568; min-height: 150px; margin-top: 10px;");
-    remoteVideoLabel->setMinimumSize(320, 180);
-    containerLayout->addWidget(remoteVideoLabel);
-
-    videoLayout->addWidget(videoContainer);
-
-    // 视频控制按钮
-    QHBoxLayout *videoButtonLayout = new QHBoxLayout();
-    startVideoButton = new QPushButton("开始视频", videoWidget);
-    startVideoButton->setStyleSheet(
-        "QPushButton { background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 4px; border: none; }"
-        "QPushButton:hover { background-color: #2563eb; }"
-        "QPushButton:disabled { background-color: #cbd5e1; }"
-        );
-
-    stopVideoButton = new QPushButton("停止视频", videoWidget);
-    stopVideoButton->setStyleSheet(
-        "QPushButton { background-color: #ef4444; color: white; padding: 8px 16px; border-radius: 4px; border: none; }"
-        "QPushButton:hover { background-color: #dc2626; }"
-        "QPushButton:disabled { background-color: #cbd5e1; }"
-        );
-
-    videoButtonLayout->addWidget(startVideoButton);
-    videoButtonLayout->addWidget(stopVideoButton);
-    videoButtonLayout->addStretch();
-    videoLayout->addLayout(videoButtonLayout);
-
-    // 添加到主布局
-    QHBoxLayout *mainLayout = qobject_cast<QHBoxLayout*>(this->layout());
-    if (mainLayout) {
-        mainLayout->addWidget(videoWidget, 1); // 视频区域占1份
-    }
-
-    // 连接视频按钮信号
-    connect(startVideoButton, &QPushButton::clicked, this, &MeetingDialog::onStartVideoClicked);
-    connect(stopVideoButton, &QPushButton::clicked, this, &MeetingDialog::onStopVideoClicked);
+    
 }
 
 // 以下是原有的功能逻辑实现
 void MeetingDialog::onSocketConnected()
 {
     addMessageToChat("系统", "已连接到会议服务器");
-    startVideoButton->setEnabled(true);
 }
 
 void MeetingDialog::onSocketError(QAbstractSocket::SocketError error)
@@ -266,25 +180,30 @@ void MeetingDialog::onSocketError(QAbstractSocket::SocketError error)
     QMessageBox::warning(this, "连接错误",
                          QString("无法连接到会议服务器: %1").arg(tcpSocket->errorString()));
     leaveMeetingButton->setEnabled(false);
-    startVideoButton->setEnabled(false);
-    stopVideoButton->setEnabled(false);
 }
 
 void MeetingDialog::onJoinMeetingClicked()
 {
-    if (tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        QMessageBox::warning(this, "连接错误", "与会议服务器的连接已断开");
+    if (!tcpSocket) return;
+
+    if (tcpSocket->state() == QAbstractSocket::ConnectedState) {
+        sendJoinMeeting();
         return;
     }
-    sendJoinMeeting();
+
+    addMessageToChat("系统", QString("正在连接到会议服务器 %1:%2 ...").arg(serverHost_).arg(serverPort_));
+    // 避免残留连接
+    tcpSocket->abort();
+    // 仅本次连上后发 join
+    connect(tcpSocket, &QTcpSocket::connected, 
+            this, &MeetingDialog::sendJoinMeeting,
+            Qt::UniqueConnection);
+    tcpSocket->connectToHost(serverHost_, serverPort_);
 }
 
 void MeetingDialog::onLeaveMeetingClicked()
 {
     sendLeaveMeeting();
-#ifdef QT_MULTIMEDIA_LIB
-    stopVideo();
-#endif
 }
 
 void MeetingDialog::onSendButtonClicked()
@@ -297,145 +216,6 @@ void MeetingDialog::onSendButtonClicked()
 
     sendChatMessage(message);
     messageEdit->clear();
-}
-
-void MeetingDialog::onStartVideoClicked()
-{
-#ifdef QT_MULTIMEDIA_LIB
-    startVideo();
-#else
-    addMessageToChat("系统", "视频功能不可用（未启用多媒体支持）");
-#endif
-}
-// meetingdialog.cpp
-// 请直接覆盖原来的 startVideo / stopVideo
-// 其余代码保持不变
-
-void MeetingDialog::startVideo()
-{
-    // 如果已启动，则忽略
-    if (fakeVideoThread)
-        return;
-
-    //指定本地视频文件地址
-    QString localVideoPath = ":/videos/my_video.mp4";
-
-    // 生成一张纯色测试图（640×480 绿色）
-    QFile videoFile(localVideoPath);
-    if (videoFile.exists()) {
-        // 使用本地视频文件作为伪装源
-        fakeVideoThread = new FakeVideoThread(this);
-        fakeVideoThread->setVideoFile(localVideoPath);
-
-        connect(fakeVideoThread, &FakeVideoThread::frameReady,
-                this, [this](const QImage &img){
-                    // 本地预览
-                    localVideoLabel->setPixmap(
-                        QPixmap::fromImage(img).scaled(
-                            localVideoLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                    // 发送给服务器
-                    sendVideoFrame(img);
-                });
-        fakeVideoThread->start();
-
-        addMessageToChat("系统", QString("正在播放本地视频: %1").arg(QFileInfo(localVideoPath).fileName()));
-    } else {
-        // 如果视频文件不存在，使用默认的纯色测试图
-        addMessageToChat("系统", "视频文件不存在，使用默认虚拟视频");
-
-        QImage fakeFrame(640, 480, QImage::Format_RGB32);
-        fakeFrame.fill(Qt::green);
-
-        fakeVideoThread = new FakeVideoThread(fakeFrame, this);
-        connect(fakeVideoThread, &FakeVideoThread::frameReady,
-                this, [this](const QImage &img){
-                    localVideoLabel->setPixmap(
-                        QPixmap::fromImage(img).scaled(
-                            localVideoLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                    sendVideoFrame(img);
-                });
-        fakeVideoThread->start();
-    }
-
-    startVideoButton->setEnabled(false);
-    stopVideoButton->setEnabled(true);
-    addMessageToChat("系统", "虚拟视频已启动");
-}
-
-void MeetingDialog::stopVideo()
-{
-    if (fakeVideoThread) {
-        fakeVideoThread->stop();
-        fakeVideoThread->deleteLater();
-        fakeVideoThread = nullptr;
-    }
-
-    localVideoLabel->clear();
-    localVideoLabel->setText("本地视频");
-    remoteVideoLabel->clear();
-    remoteVideoLabel->setText("远程视频");
-
-    startVideoButton->setEnabled(isInMeeting);
-    stopVideoButton->setEnabled(false);
-    addMessageToChat("系统", "虚拟视频已停止");
-}
-
-void MeetingDialog::sendVideoFrame(const QImage &frame)
-{
-#ifdef QT_MULTIMEDIA_LIB
-    if (!isInMeeting || !tcpSocket || tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        return;
-    }
-
-    // 发送视频帧到服务器
-    QByteArray imgData;
-    QBuffer buffer(&imgData);
-    buffer.open(QIODevice::WriteOnly);
-    frame.save(&buffer, "JPEG", 50);
-
-    // 调整图像大小以提高传输效率
-    QImage scaledImage = frame.scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    scaledImage.save(&buffer, "JPEG", 50);  // 50% 质量
-
-    QJsonObject videoMsg;
-    videoMsg["type"] = "video_frame";
-    videoMsg["data"] = QString(imgData.toBase64());
-    videoMsg["timestamp"] = QDateTime::currentDateTime().toString("hh:mm:ss");
-
-    QJsonDocument doc(videoMsg);
-    QByteArray data = "JSON:" + doc.toJson(QJsonDocument::Compact) + "\n";
-    tcpSocket->write(data);
-#endif
-}
-
-void MeetingDialog::onVideoFrameReceived(const QImage &frame)
-{
-    QPixmap pixmap = QPixmap::fromImage(frame);
-    remoteVideoLabel->setPixmap(pixmap.scaled(remoteVideoLabel->size(),
-                                              Qt::KeepAspectRatio,
-                                              Qt::SmoothTransformation));
-}
-
-void MeetingDialog::processVideoFrame(const QJsonObject &json)
-{
-    QString type = json["type"].toString();
-    if (type == "video_frame") {
-        QString base64Data = json["data"].toString();
-        QByteArray imgData = QByteArray::fromBase64(base64Data.toUtf8());
-        QImage image;
-        if (image.loadFromData(imgData, "JPEG")) {
-            onVideoFrameReceived(image);
-        }
-    }
-}
-
-void MeetingDialog::onStopVideoClicked()
-{
-#ifdef QT_MULTIMEDIA_LIB
-    stopVideo();
-#else
-    addMessageToChat("系统", "视频功能不可用");
-#endif
 }
 
 void MeetingDialog::sendChatMessage(const QString &message)
@@ -462,7 +242,7 @@ void MeetingDialog::sendJoinMeeting()
     QJsonObject joinMsg;
     joinMsg["type"] = "join_meeting";
     joinMsg["user"] = username;
-    joinMsg["user_type"] = "factory";
+    joinMsg["user_type"] = "factory"; 
 
     QJsonDocument doc(joinMsg);
     if (tcpSocket->state() == QAbstractSocket::ConnectedState) {
@@ -515,14 +295,7 @@ void MeetingDialog::onSocketReadyRead()
             QJsonParseError error;
             QJsonDocument doc = QJsonDocument::fromJson(data.mid(5), &error);
             if (error.error == QJsonParseError::NoError && !doc.isNull()) {
-                QJsonObject json = doc.object();
-                QString type = json["type"].toString();
-
-                if (type == "video_frame") {
-                    processVideoFrame(json);
-                } else {
-                    handleServerMessage(json);
-                }
+                handleServerMessage(doc.object());
             }
         }
         else if (data.startsWith("AUDIO:")) {
@@ -565,11 +338,10 @@ void MeetingDialog::handleServerMessage(const QJsonObject &json)
         leaveMeetingButton->setEnabled(true);
         joinMeetingButton->setEnabled(false);
         sendButton->setEnabled(true);
-        startVideoButton->setEnabled(true);
         audioButton->setEnabled(true);  // 启用音频按钮
         addMessageToChat("系统", "已成功加入会议室");
     }
-    else if (type == "image_message") {
+     else if (type == "image_message") {
         QString user = json["user"].toString();
         QString imageData = json["image_data"].toString();
         
@@ -596,11 +368,6 @@ void MeetingDialog::handleServerMessage(const QJsonObject &json)
         addMessageToChat("系统错误", errorMsg);
         leaveMeetingButton->setEnabled(true);
     }
-    else if (type == "meeting_closed") {
-        QString message = json["message"].toString();
-        addMessageToChat("系统", message);
-        onLeaveMeetingClicked();
-    }
 }
 
 void MeetingDialog::onSocketDisconnected()
@@ -608,16 +375,11 @@ void MeetingDialog::onSocketDisconnected()
     QMessageBox::warning(this, "连接断开", "与会议服务器的连接已断开");
     isInMeeting = false;
     leaveMeetingButton->setEnabled(false);
-    joinMeetingButton->setEnabled(false);
+    joinMeetingButton->setEnabled(true);   // 允许再次连接
     sendButton->setEnabled(false);
-    startVideoButton->setEnabled(false);
-    stopVideoButton->setEnabled(false);
-
-#ifdef QT_MULTIMEDIA_LIB
-    stopVideo();
-#endif
-
-    emit meetingClosed();
+    sendImageButton->setEnabled(false);
+    audioButton->setEnabled(false);
+    // 不要 emit meetingClosed() 除非你要直接关闭窗口
 }
 
 void MeetingDialog::addMessageToChat(const QString &sender, const QString &message)

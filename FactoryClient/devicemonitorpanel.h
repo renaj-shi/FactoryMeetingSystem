@@ -15,6 +15,7 @@ class QLabel;
 class QFrame;
 class QPropertyAnimation;
 class QTimer;
+class DeviceLineChartDialog;
 
 // 设备监控面板类
 class DeviceMonitorPanel : public QWidget
@@ -41,6 +42,9 @@ protected:
 private slots:
     // 设备栏点击事件
     void onDeviceBarClicked(const QString &deviceId);
+    
+    // 折线图按钮点击事件
+    void onChartButtonClicked(const DeviceInfo &device);
     
 public:
     // 定时更新数据 - 移到public以便外部调用
@@ -84,6 +88,9 @@ private:
     QMap<QString, QWidget*> m_parameterDrawers;
     QMap<QString, QPropertyAnimation*> m_drawerAnimations;
     QMap<QString, bool> m_drawerVisibleStates;
+    
+    // 折线图对话框映射
+    QMap<QString, DeviceLineChartDialog*> m_chartDialogs;
     
     // 数据更新定时器
     QTimer *m_updateTimer;

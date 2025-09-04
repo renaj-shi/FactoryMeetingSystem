@@ -1,4 +1,4 @@
-QT       += core gui network widgets multimedia multimediawidgets
+QT       += core gui network widgets multimedia multimediawidgets charts
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -7,14 +7,12 @@ CONFIG += c++17
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
-QT += multimedia multimediawidgets
-
-DEFINES += QT_MULTIMEDIA_LIB
 
 SOURCES += \
-    fakevideothread.cpp \
     meetingdialog.cpp \
     workorderdialog.cpp \
+    workorderlistdialog.cpp \
+    workorderdetaildialog.cpp \
     main.cpp \
     mainwindow.cpp \
     registerdialog.cpp \
@@ -23,12 +21,17 @@ SOURCES += \
     devicemonitorpanel.cpp \
     accountinfodialog.cpp \
     chatdialog.cpp \
-    audioprocessor.cpp
+    audioprocessor.cpp \
+    videoprocessor.cpp \
+    devicelinechartdialog.cpp \
+    screenrecorder.cpp \
+    screenrecordingwidget.cpp \
 
 HEADERS += \
-    fakevideothread.h \
     meetingdialog.h \
     workorderdialog.h \
+    workorderlistdialog.h \
+    workorderdetaildialog.h \
     mainwindow.h \
     registerdialog.h \
     maininterfacedialog.h \
@@ -36,7 +39,11 @@ HEADERS += \
     devicemonitorpanel.h \
     accountinfodialog.h \
     chatdialog.h \
-    audioprocessor.h
+    audioprocessor.h \
+    videoprocessor.h \
+    devicelinechartdialog.h \
+    screenrecorder.h \
+    screenrecordingwidget.h \
 
 FORMS += \
     mainwindow.ui \
@@ -45,8 +52,12 @@ FORMS += \
     maininterfacedialog.ui \
     devicemonitorpanel.ui \
     workorderdialog.ui \
+    workorderlistdialog.ui \
+    workorderdetaildialog.ui \
     accountinfodialog.ui \
-    chatdialog.ui
+    chatdialog.ui \
+    devicelinechartdialog.ui \
+    screenrecordingwidget.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

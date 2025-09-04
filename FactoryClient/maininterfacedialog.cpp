@@ -4,9 +4,11 @@
 #include "registerdialog.h"
 #include "devicemonitorpanel.h"
 #include "workorderdialog.h"
+#include "workorderlistdialog.h"
 #include "accountinfodialog.h"
 #include "chatdialog.h"
 #include "meetingdialog.h"
+#include "screenrecordingwidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -219,7 +221,7 @@ void MainInterfaceDialog::createSidebar()
     connect(ui->newWorkOrderButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_newWorkOrderButton_clicked);
     workOrderLayout->addWidget(ui->newWorkOrderButton);
 
-    ui->workOrderListButton = new QPushButton("历史工单", this);
+    ui->workOrderListButton = new QPushButton("工单列表", this);
     ui->workOrderListButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #e2e8f0; text-align: left; padding: 10px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #334155; }"
@@ -244,14 +246,14 @@ void MainInterfaceDialog::createSidebar()
     communicationLayout->addWidget(ui->textMessageButton);
 
 
-    ui->joinMeetingButton = new QPushButton("在线会议", this);
-    ui->joinMeetingButton->setStyleSheet(
+    QPushButton* joinMeetingButton = new QPushButton("在线会议", this);
+    joinMeetingButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #e2e8f0; text-align: left; padding: 10px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #334155; }"
         "QPushButton:pressed { background-color: #475569; }"
         );
-    connect(ui->joinMeetingButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_joinMeetingButton_clicked);
-    communicationLayout->addWidget(ui->joinMeetingButton);
+    connect(joinMeetingButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_joinMeetingButton_clicked);
+    communicationLayout->addWidget(joinMeetingButton);
 
 
     // 设备监控组
@@ -269,7 +271,7 @@ void MainInterfaceDialog::createSidebar()
     connect(ui->realTimeDataButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_realTimeDataButton_clicked);
     deviceMonitorLayout->addWidget(ui->realTimeDataButton);
 
-    ui->deviceRecordingButton = new QPushButton("设备录制", this);
+    ui->deviceRecordingButton = new QPushButton("屏幕录制", this);
     ui->deviceRecordingButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #e2e8f0; text-align: left; padding: 10px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #334155; }"
@@ -278,29 +280,11 @@ void MainInterfaceDialog::createSidebar()
     connect(ui->deviceRecordingButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_deviceRecordingButton_clicked);
     deviceMonitorLayout->addWidget(ui->deviceRecordingButton);
 
-
-
-    // 知识库组
-    QGroupBox *knowledgeBaseGroupBox = new QGroupBox("知识库", this);
-    knowledgeBaseGroupBox->setStyleSheet("QGroupBox { color: #e2e8f0; font-weight: bold; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; left: 10px; }");
-    QVBoxLayout *knowledgeBaseLayout = new QVBoxLayout(knowledgeBaseGroupBox);
-    knowledgeBaseLayout->setContentsMargins(10, 20, 10, 10);
-
-    ui->knowledgeBaseButton = new QPushButton("企业知识库", this);
-    ui->knowledgeBaseButton->setStyleSheet(
-        "QPushButton { background-color: transparent; color: #e2e8f0; text-align: left; padding: 10px; border-radius: 4px; }"
-        "QPushButton:hover { background-color: #334155; }"
-        "QPushButton:pressed { background-color: #475569; }"
-        );
-    connect(ui->knowledgeBaseButton, &QPushButton::clicked, this, &MainInterfaceDialog::on_knowledgeBaseButton_clicked);
-    knowledgeBaseLayout->addWidget(ui->knowledgeBaseButton);
-
     // 添加所有组到侧边栏布局
     sidebarLayout->addWidget(userGroupBox);
     sidebarLayout->addWidget(workOrderGroupBox);
     sidebarLayout->addWidget(communicationGroupBox);
     sidebarLayout->addWidget(deviceMonitorGroupBox);
-    sidebarLayout->addWidget(knowledgeBaseGroupBox);
     sidebarLayout->addStretch();
 }
 
@@ -609,49 +593,14 @@ QWidget *MainInterfaceDialog::createFeatureContentWidget(const QString &featureN
             statusLabel->setText("会议状态: 正在创建会议...");
             QMessageBox::information(this, "创建会议", "会议创建功能正在开发中");
         });
-    }else if (featureName == "newWorkOrder") {
-
-        QLabel *title = new QLabel("新建工单", this);
-        title->setStyleSheet("font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 20px;");
-        contentLayout->addWidget(title);
-
-        auto form = new QWidget(this);
-        form->setStyleSheet("background-color:#f8fafc; border-radius:8px; padding:20px;");
-        auto fy = new QVBoxLayout(form);
-
-        auto row1 = new QHBoxLayout();
-        row1->addWidget(new QLabel("标题:", form));
-        newTitleEdit_ = new QLineEdit(form);
-        newTitleEdit_->setPlaceholderText("不要包含 | 字符");
-        row1->addWidget(newTitleEdit_, 1);
-        fy->addLayout(row1);
-
-        auto row2 = new QHBoxLayout();
-        row2->addWidget(new QLabel("优先级:", form));
-        newPrioBox_ = new QComboBox(form);
-        newPrioBox_->addItems({"低","中","高"});
-        row2->addWidget(newPrioBox_);
-        fy->addLayout(row2);
-
-        auto row3 = new QVBoxLayout();
-        row3->addWidget(new QLabel("问题描述:", form));
-        newDescEdit_ = new QTextEdit(form);
-        newDescEdit_->setPlaceholderText("不要包含 | 字符");
-        row3->addWidget(newDescEdit_);
-        fy->addLayout(row3);
-
-        auto rowBtn = new QHBoxLayout();
-        auto btn = new QPushButton("创建工单", form);
-        newResultLabel_ = new QLabel("", form);
-        newResultLabel_->setStyleSheet("color:#0ea5e9;");
-        rowBtn->addWidget(btn);
-        rowBtn->addWidget(newResultLabel_, 1);
-        fy->addLayout(rowBtn);
-
-        connect(btn, &QPushButton::clicked, this, &MainInterfaceDialog::onCreateTicketClicked);
-
-        contentLayout->addWidget(form);
-    }else if (featureName == "newWorkOrder") {
+    } else if (featureName == "workOrderList") {
+        // 创建工单列表页面
+        if (m_workOrderListDialog == nullptr) {
+            m_workOrderListDialog = new WorkOrderListDialog(this);
+            m_workOrderListDialog->setConnection(m_socket, m_username);
+        }
+        contentLayout->addWidget(m_workOrderListDialog);
+    } else if (featureName == "newWorkOrder") {
         // 使用独立的WorkOrderDialog类
         WorkOrderDialog *workOrderDialog = new WorkOrderDialog(this);
         m_workOrderDialog = workOrderDialog; // 保存引用
@@ -697,6 +646,33 @@ QWidget *MainInterfaceDialog::createFeatureContentWidget(const QString &featureN
         });
         
         contentLayout->addWidget(chatDialog, 1);
+    } else if (featureName == "deviceRecording") {
+        // 屏幕录制功能
+        ScreenRecordingWidget *recordingWidget = new ScreenRecordingWidget(contentWidget);
+        m_screenRecordingWidget = recordingWidget; // 记住指针
+
+        // 让录制页可以发出"请求刷新工单列表"的信号
+        connect(recordingWidget, &ScreenRecordingWidget::requestRefreshTickets,
+                this, [this]{
+                    requestTickets(1, 200);
+                }, Qt::UniqueConnection);
+
+        // 若工单列表页存在，可以保留"选中工单"同步（列表页改变选中 -> 录制页跟着变）
+        if (m_workOrderListDialog) {
+            connect(m_workOrderListDialog, &WorkOrderListDialog::currentTicketChanged,
+                    recordingWidget, &ScreenRecordingWidget::setWorkOrderId,
+                    Qt::UniqueConnection);
+        }
+
+        // 先用缓存填充；没有缓存则立刻向服务器请求
+        if (!m_ticketCache.isEmpty()) {
+            recordingWidget->setWorkOrders(m_ticketCache);
+        } else {
+            requestTickets(1, 200);
+        }
+
+        // 添加到布局
+        contentLayout->addWidget(recordingWidget);
     } else {
         // 其他功能页面
         QLabel *titleLabel = new QLabel(displayName, this);
@@ -763,14 +739,7 @@ void MainInterfaceDialog::on_realTimeDataButton_clicked()
 
 void MainInterfaceDialog::on_deviceRecordingButton_clicked()
 {
-    createAndShowFeaturePage("deviceRecording", "设备录制");
-}
-
-
-
-void MainInterfaceDialog::on_knowledgeBaseButton_clicked()
-{
-    createAndShowFeaturePage("knowledgeBase", "企业知识库");
+    createAndShowFeaturePage("deviceRecording", "屏幕录制");
 }
 
 void MainInterfaceDialog::on_tabBar_currentChanged(int index) {
@@ -800,6 +769,17 @@ void MainInterfaceDialog::on_tabBar_tabCloseRequested(int index)
     ui->tabBar->removeTab(index);
     QWidget* pageWidget = ui->stackedWidget->widget(pageIndex);
     ui->stackedWidget->removeWidget(pageWidget);
+    
+    // 特别处理工单列表页面，确保删除时将指针置空
+    if (featureName == "workOrderList") {
+        m_workOrderListDialog = nullptr;
+    }
+    
+    // 特别处理屏幕录制页面，确保删除时将指针置空
+    if (featureName == "deviceRecording") {
+        m_screenRecordingWidget = nullptr;
+    }
+    
     delete pageWidget;
 
     for(auto it = m_featurePageMap.begin(); it != m_featurePageMap.end(); ++it) {
@@ -879,6 +859,9 @@ void MainInterfaceDialog::onSocketReadyRead() {
     if (!m_socket) return;
 
     m_recvBuf += m_socket->readAll();
+    
+    // 调试：打印收到的原始数据
+    qDebug() << "RECV:" << m_recvBuf;
 
     int pos;
     while ((pos = m_recvBuf.indexOf('\n')) != -1) {
@@ -969,6 +952,61 @@ void MainInterfaceDialog::onSocketReadyRead() {
                 if (m_chatDialog) {
                     m_chatDialog->appendMessage(sender, message, false);
                 }
+            }
+        } else if (type == "TICKET_DATA") {
+            // 1) 仍然转发给工单列表页（保持兼容），注意把 JSON 用 mid(2) 拼回
+            if (m_workOrderListDialog && p.size() >= 3) {
+                const QString data = p.mid(2).join("|");
+                const QString messageLine = "TICKET|LIST|" + data;
+                m_workOrderListDialog->handleTicketData(messageLine);
+            }
+
+            // 2) 新增：也更新录制页
+            const auto list = parseTicketListLine(line);
+            if (!list.isEmpty()) {
+                m_ticketCache = list;
+                if (m_screenRecordingWidget) {
+                    m_screenRecordingWidget->setWorkOrders(list);
+                }
+            } else {
+                // 可选：调试输出，看看服务器回了什么
+                qDebug() << "[Tickets] parse TICKET_DATA failed, line=" << line;
+            }
+        } else if (type == "DEVICE_LOGS") {
+            // 处理设备日志数据，转发给工单列表对话框
+            if (p.size() >= 4) {
+                // 构造符合WorkOrderListDialog期望的格式："TICKET|LOGS|ticketId|data"
+                QString ticketId = p[2];
+                QString data = p[3];
+                QString messageLine = "TICKET|LOGS|" + ticketId + "|" + data;
+                if (m_workOrderListDialog) {
+                    m_workOrderListDialog->handleTicketData(messageLine);
+                }
+            }
+        } else if (type == "FAULT_INFO") {
+            // 处理故障信息数据，转发给工单列表对话框
+            if (p.size() >= 4) {
+                // 构造符合WorkOrderListDialog期望的格式："TICKET|FAULTS|ticketId|data"
+                QString ticketId = p[2];
+                QString data = p[3];
+                QString messageLine = "TICKET|FAULTS|" + ticketId + "|" + data;
+                if (m_workOrderListDialog) {
+                    m_workOrderListDialog->handleTicketData(messageLine);
+                }
+            }
+        } else if (type == "TICKET" || type == "TICKETS") {
+            if (m_workOrderListDialog) {
+                m_workOrderListDialog->handleTicketData(line);
+            }
+
+            const auto list = parseTicketListLine(line);
+            if (!list.isEmpty()) {
+                m_ticketCache = list;
+                if (m_screenRecordingWidget) {
+                    m_screenRecordingWidget->setWorkOrders(list);
+                }
+            } else {
+                qDebug() << "[Tickets] parse TICKET(S) failed, line=" << line;
             }
         }
     }
@@ -1143,4 +1181,77 @@ QString MainInterfaceDialog::getValueFromJson(const QString &json, const QString
     QString value = json.mid(startPos, endPos - startPos).trimmed();
     
     return value.isEmpty() ? defaultValue : value;
+}
+
+// 请求工单列表
+auto MainInterfaceDialog::requestTickets(int page, int size) -> void {
+    if (m_socket && m_socket->isOpen()) {
+        const QString cmd = QString("TICKETS|LIST|%1|%2\n").arg(page).arg(size);
+        m_socket->write(cmd.toUtf8());
+        m_socket->flush();
+    } else {
+        if (m_screenRecordingWidget) {
+            // 录制页里已经有 appendLog，可加个信号触达；或直接调一个公开方法
+            // 简单点：暂时用 qDebug
+            qDebug() << "[Tickets] socket not connected; cannot request list";
+        }
+    }
+}
+
+// 解析工单列表数据
+QList<QPair<int,QString>> MainInterfaceDialog::parseTicketListLine(const QString& line) {
+    const QStringList parts = line.split('|');
+    // 找到 JSON 起始分段
+    int jsonIdx = -1;
+    for (int i = 0; i < parts.size(); ++i) {
+        const QString t = parts[i].trimmed();
+        if (t.startsWith('{') || t.startsWith('[')) {
+            jsonIdx = i;
+            break;
+        }
+    }
+    if (jsonIdx == -1) return {};
+
+    const QString payload = parts.mid(jsonIdx).join("|");
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(payload.toUtf8(), &err);
+    if (err.error != QJsonParseError::NoError) {
+        return {};
+    }
+
+    QList<QPair<int, QString>> out;
+
+    auto pickId = [](const QJsonObject& o)->int {
+        if (o.contains("id")) return o.value("id").toInt();
+        if (o.contains("ticketId")) return o.value("ticketId").toInt();
+        return 0;
+    };
+    auto pickTitle = [](const QJsonObject& o)->QString {
+        if (o.contains("title")) return o.value("title").toString();
+        if (o.contains("name")) return o.value("name").toString();
+        if (o.contains("subject")) return o.value("subject").toString();
+        return {};
+    };
+    auto pushObj = [&](const QJsonObject& o){
+        const int id = pickId(o);
+        if (id <= 0) return;
+        QString title = pickTitle(o);
+        if (title.isEmpty()) title = QString::number(id);
+        out.append({id, title});
+    };
+
+    if (doc.isArray()) {
+        for (const auto& v : doc.array())
+            if (v.isObject()) pushObj(v.toObject());
+    } else if (doc.isObject()) {
+        const auto obj = doc.object();
+        if (obj.contains("list") && obj.value("list").isArray()) {
+            for (const auto& v : obj.value("list").toArray())
+                if (v.isObject()) pushObj(v.toObject());
+        } else {
+            pushObj(obj);
+        }
+    }
+    return out;
 }

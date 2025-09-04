@@ -36,7 +36,9 @@ struct DeviceParams {
 
 // 前向声明
 class WorkOrderDialog;
+class WorkOrderListDialog;
 class ChatDialog;
+class ScreenRecordingWidget;
 
 namespace Ui {
 class MainInterfaceDialog;
@@ -64,7 +66,6 @@ private slots:
     void on_deviceMonitorButton_clicked();
     void on_realTimeDataButton_clicked();
     void on_deviceRecordingButton_clicked();
-    void on_knowledgeBaseButton_clicked();
 
     // 标签栏事件
     void on_tabBar_currentChanged(int index);
@@ -92,8 +93,11 @@ private:
     QLabel* newResultLabel_= nullptr;
     DeviceMonitorPanel* m_deviceMonitorPanel = nullptr; // 指向设备监控面板的指针
     WorkOrderDialog* m_workOrderDialog = nullptr; // 指向新建工单对话框的指针
+    WorkOrderListDialog* m_workOrderListDialog = nullptr; // 指向工单列表对话框的指针
     ChatDialog* m_chatDialog = nullptr; // 指向聊天对话框的指针
+    ScreenRecordingWidget* m_screenRecordingWidget = nullptr; // 指向屏幕录制窗口的指针
     QMap<QString, DeviceParams> m_deviceDataCache; // 设备数据缓存，用于实时页未创建时存储数据
+    QList<QPair<int, QString>> m_ticketCache; // 工单数据缓存
     MeetingDialog *meetingDialog;
 
     void setupUI(); // 设置UI
@@ -107,6 +111,10 @@ private:
     QString getValueFromJson(const QString &json, const QString &key, const QString &defaultValue = "0");
     // 检查并应用缓存的设备数据
     void applyDeviceDataCache();
+    // 解析工单列表数据
+    QList<QPair<int,QString>> parseTicketListLine(const QString& line);
+    // 请求工单列表
+    void requestTickets(int page = 1, int size = 200);
 };
 
 #endif // MAININTERFACEDIALOG_H

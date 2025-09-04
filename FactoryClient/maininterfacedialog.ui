@@ -39,7 +39,6 @@
   <widget class="QPushButton" name="deviceMonitorButton"/>
   <widget class="QPushButton" name="realTimeDataButton"/>
   <widget class="QPushButton" name="deviceRecordingButton"/>
-  <widget class="QPushButton" name="knowledgeBaseButton"/>
   <widget class="QPushButton" name="accountButton"/>
   <widget class="QPushButton" name="logoutButton"/>
  </widget>
